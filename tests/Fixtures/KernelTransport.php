@@ -25,11 +25,11 @@ class KernelTransport implements SyncTransport
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json',
             'HTTP_X-Test-Principal' => $this->principal,
-        ], json_encode($body, JSON_THROW_ON_ERROR));
+        ], json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         $response = $this->app->make(Kernel::class)->handle($request);
-        $decoded = json_decode((string) $response->getContent(), true);
+        $decoded = json_decode((string) $response->getContent(), false, 512);
 
-        return new SyncResponse($response->getStatusCode(), is_array($decoded) ? $decoded : []);
+        return new SyncResponse($response->getStatusCode(), $decoded instanceof \stdClass ? $decoded : new \stdClass);
     }
 }

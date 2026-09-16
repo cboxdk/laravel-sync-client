@@ -1,7 +1,7 @@
 {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:de2684a9-3307-586f-9997-495d798e46ca",
+    "serialNumber": "urn:uuid:e7ffca1f-4658-5014-807a-8f1bfefad10e",
     "version": 1,
     "metadata": {
         "component": {
@@ -90,12 +90,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.1.0",
+            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.1.1",
             "group": "cboxdk",
             "name": "laravel-sync",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "scope": "optional",
-            "purl": "pkg:composer/cboxdk/laravel-sync@v0.1.0",
+            "purl": "pkg:composer/cboxdk/laravel-sync@v0.1.1",
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "licenses": [
                 {
@@ -105,7 +105,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/344300684a0b8638229b3e07bf061308ae42548b"
+                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/58419a9fa4b1a24277190a23927beab4b183f55d"
                 },
                 {
                     "type": "vcs",

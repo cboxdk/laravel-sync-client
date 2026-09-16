@@ -11,6 +11,8 @@ jobs:
   quality:
     name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cboxdk/php-baseimages/php-cli:${{ matrix.php || '8.4' }}-bookworm-dev
     strategy:
       fail-fast: false
       matrix:
@@ -20,13 +22,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          coverage: none
-          tools: composer:v2
 
       - name: Validate Composer metadata
         run: composer validate --strict

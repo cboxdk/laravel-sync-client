@@ -4,50 +4,48 @@ declare(strict_types=1);
 
 namespace Cbox\Sync\Client\Laravel\Support;
 
-/** Type-narrowing reads off a decoded response. A malformed one is a bug in the server, and says so. */
+/**
+ * Type-narrowing reads off a decoded response.
+ *
+ * Everything here works on stdClass, never associative arrays, and that is the
+ * whole point: json_decode with assoc returns [] for {}, so an empty object in
+ * a field value would arrive as an empty array and be stored as one. The
+ * corruption is consistent, so nothing downstream ever notices.
+ */
 class Read
 {
-    /**
-     * @param  array<array-key, mixed>  $body
-     * @return array<array-key, mixed>
-     */
-    public static function array(array $body, string $key): array
+    public static function object(\stdClass $body, string $key): \stdClass
     {
-        $value = $body[$key] ?? null;
+        $value = $body->{$key} ?? null;
 
-        return is_array($value) ? $value : throw self::fail($key, 'an object');
+        return $value instanceof \stdClass ? $value : throw self::fail($key, 'an object');
     }
 
-    /**
-     * @param  array<array-key, mixed>  $body
-     * @return list<array<array-key, mixed>>
-     */
-    public static function list(array $body, string $key): array
+    /** @return list<\stdClass> */
+    public static function objects(\stdClass $body, string $key): array
     {
-        $value = $body[$key] ?? null;
-        if (! is_array($value)) {
+        $value = $body->{$key} ?? null;
+        if (! is_array($value) || ! array_is_list($value)) {
             throw self::fail($key, 'a list');
         }
         $items = [];
         foreach ($value as $item) {
-            $items[] = is_array($item) ? $item : throw self::fail($key, 'a list of objects');
+            $items[] = $item instanceof \stdClass ? $item : throw self::fail($key, 'a list of objects');
         }
 
         return $items;
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function string(array $body, string $key): string
+    public static function string(\stdClass $body, string $key): string
     {
-        $value = $body[$key] ?? null;
+        $value = $body->{$key} ?? null;
 
         return is_string($value) && $value !== '' ? $value : throw self::fail($key, 'a non-empty string');
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function optionalString(array $body, string $key): ?string
+    public static function optionalString(\stdClass $body, string $key): ?string
     {
-        $value = $body[$key] ?? null;
+        $value = $body->{$key} ?? null;
         if ($value === null) {
             return null;
         }
@@ -55,18 +53,16 @@ class Read
         return is_string($value) && $value !== '' ? $value : throw self::fail($key, 'a string or null');
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function int(array $body, string $key): int
+    public static function int(\stdClass $body, string $key): int
     {
-        $value = $body[$key] ?? null;
+        $value = $body->{$key} ?? null;
 
         return is_int($value) ? $value : throw self::fail($key, 'an integer');
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function bool(array $body, string $key): bool
+    public static function bool(\stdClass $body, string $key): bool
     {
-        $value = $body[$key] ?? null;
+        $value = $body->{$key} ?? null;
 
         return is_bool($value) ? $value : throw self::fail($key, 'a boolean');
     }

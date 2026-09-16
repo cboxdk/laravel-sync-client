@@ -13,6 +13,7 @@ use Cbox\Sync\Client\Laravel\SyncClient;
 use Cbox\Sync\Client\Laravel\SyncClientServiceProvider;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\HeaderPrincipals;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\KernelTransport;
+use Cbox\Sync\Client\Laravel\Tests\Fixtures\NodeType;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\TaskType;
 use Cbox\Sync\Client\Laravel\ViewIndex;
 use Cbox\Sync\Client\Outbox;
@@ -50,7 +51,7 @@ class TestCase extends BaseTestCase
 
         $app['config']->set('sync.api.enabled', true);
         $app['config']->set('sync.api.middleware', []);
-        $app['config']->set('sync.api.types', ['tasks' => TaskType::class]);
+        $app['config']->set('sync.api.types', ['tasks' => TaskType::class, 'nodes' => NodeType::class]);
         $app->bind(SyncPrincipals::class, HeaderPrincipals::class);
 
         $app['config']->set('sync-client.url', 'http://localhost/sync');

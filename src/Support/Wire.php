@@ -59,10 +59,9 @@ class Wire
         return $body;
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function context(array $body): CursorContext
+    public static function context(\stdClass $body): CursorContext
     {
-        $context = Read::array($body, 'context');
+        $context = Read::object($body, 'context');
 
         return new CursorContext(
             Read::string($context, 'space'),
@@ -74,35 +73,33 @@ class Wire
         );
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function bootstrapPage(array $body, BootstrapToken $token): BootstrapPage
+    public static function bootstrapPage(\stdClass $body, BootstrapToken $token): BootstrapPage
     {
         $context = self::context($body);
         $records = [];
-        foreach (Read::list($body, 'records') as $record) {
+        foreach (Read::objects($body, 'records') as $record) {
             $records[] = self::record($record, $context->space);
         }
         $next = Read::optionalString($body, 'next_token');
-        $cursor = $body['cursor'] ?? null;
+        $cursor = $body->cursor ?? null;
 
         return new BootstrapPage(
             $records,
             $next === null ? null : new BootstrapToken($next),
-            is_array($cursor) ? self::cursor($cursor, $context) : null,
+            $cursor instanceof \stdClass ? self::cursor($cursor, $context) : null,
             $context,
             $token,
             Read::int($body, 'offset'),
         );
     }
 
-    /** @param array<array-key, mixed> $body */
-    public static function deltaPage(array $body): DeltaPage
+    public static function deltaPage(\stdClass $body): DeltaPage
     {
         $context = self::context($body);
         $commits = [];
-        foreach (Read::list($body, 'commits') as $commit) {
+        foreach (Read::objects($body, 'commits') as $commit) {
             $changes = [];
-            foreach (Read::list($commit, 'changes') as $change) {
+            foreach (Read::objects($commit, 'changes') as $change) {
                 $changes[] = self::change($change, $context->space);
             }
             $commits[] = new ViewCommit(new CommitSequence(Read::int($commit, 'sequence')), $changes);
@@ -110,47 +107,44 @@ class Wire
 
         return new DeltaPage(
             $commits,
-            self::cursor(Read::array($body, 'previous_cursor'), $context),
-            self::cursor(Read::array($body, 'cursor'), $context),
+            self::cursor(Read::object($body, 'previous_cursor'), $context),
+            self::cursor(Read::object($body, 'cursor'), $context),
             Read::bool($body, 'has_more'),
         );
     }
 
-    /** @param array<array-key, mixed> $wire */
-    private static function cursor(array $wire, CursorContext $context): ViewCursor
+    private static function cursor(\stdClass $wire, CursorContext $context): ViewCursor
     {
         return new ViewCursor($context, new CommitSequence(Read::int($wire, 'position')));
     }
 
-    /** @param array<array-key, mixed> $wire */
-    private static function change(array $wire, string $space): ViewChange
+    private static function change(\stdClass $wire, string $space): ViewChange
     {
         $kind = ViewChangeKind::from(Read::string($wire, 'kind'));
         $entity = new EntityKey($space, Read::string($wire, 'type'), Read::string($wire, 'id'));
         $version = new RecordVersion(Read::int($wire, 'version'));
-        $record = $wire['record'] ?? null;
+        $record = $wire->record ?? null;
 
         return new ViewChange(
             Read::int($wire, 'ordinal'),
             $kind,
             $entity,
             $version,
-            is_array($record) ? self::record($record, $space) : null,
+            $record instanceof \stdClass ? self::record($record, $space) : null,
         );
     }
 
-    /** @param array<array-key, mixed> $wire */
-    private static function record(array $wire, string $space): EntityRecord
+    private static function record(\stdClass $wire, string $space): EntityRecord
     {
         $fields = [];
-        foreach (Read::array($wire, 'fields') as $name => $state) {
-            if (! is_array($state)) {
+        foreach (get_object_vars(Read::object($wire, 'fields')) as $name => $state) {
+            if (! $state instanceof \stdClass) {
                 throw new \UnexpectedValueException('Malformed field state in response');
             }
             // No field version and no origin: a projection withholds both, and
             // a client acts on neither.
             $fields[(string) $name] = new FieldState(
-                ($state['present'] ?? false) === true ? FieldValue::of($state['value'] ?? null) : FieldValue::missing(),
+                ($state->present ?? false) === true ? FieldValue::of($state->value ?? null) : FieldValue::missing(),
             );
         }
 

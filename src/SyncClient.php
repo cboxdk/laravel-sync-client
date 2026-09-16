@@ -54,9 +54,9 @@ class SyncClient
             $response = $this->transport->post('push', ['type' => $type, 'scope' => $scope] + Wire::mutationToWire($mutation));
 
             if ($response->ok()) {
-                $status = $response->body['status'] ?? null;
+                $status = $response->body->status ?? null;
                 if ($status === 'mutation_gap') {
-                    $acknowledged = $response->body['acknowledged_sequence'] ?? 0;
+                    $acknowledged = $response->body->acknowledged_sequence ?? 0;
                     $acknowledged = is_int($acknowledged) ? $acknowledged : 0;
                     // Renumber from where the server actually is and try again.
                     // Twice in a row with the same answer means resending will

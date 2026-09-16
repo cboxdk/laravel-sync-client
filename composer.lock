@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "944604df4e9cfb38a8fb2b66423fa965",
+    "content-hash": "c7f8a7bb9e186422a1d7feb1f481246f",
     "packages": [
         {
             "name": "brick/math",
@@ -5975,16 +5975,16 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/laravel-sync.git",
-                "reference": "344300684a0b8638229b3e07bf061308ae42548b"
+                "reference": "58419a9fa4b1a24277190a23927beab4b183f55d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/344300684a0b8638229b3e07bf061308ae42548b",
-                "reference": "344300684a0b8638229b3e07bf061308ae42548b",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/58419a9fa4b1a24277190a23927beab4b183f55d",
+                "reference": "58419a9fa4b1a24277190a23927beab4b183f55d",
                 "shasum": ""
             },
             "require": {
@@ -6015,53 +6015,16 @@
                     "Cbox\\Sync\\Laravel\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Cbox\\Sync\\Laravel\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "pest"
-                ],
-                "lint": [
-                    "pint --test"
-                ],
-                "format": [
-                    "pint"
-                ],
-                "analyse": [
-                    "phpstan analyse --no-progress --memory-limit=1G"
-                ],
-                "license-check": [
-                    "@php bin/check-licenses.php"
-                ],
-                "sbom": [
-                    "@php bin/generate-sbom.php"
-                ],
-                "docs:requirements": [
-                    "@php bin/generate-requirements.php"
-                ],
-                "security-audit": [
-                    "@composer audit --locked"
-                ],
-                "qa": [
-                    "@lint",
-                    "@analyse",
-                    "@test",
-                    "@license-check",
-                    "@security-audit"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "support": {
-                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.1.0",
-                "issues": "https://github.com/cboxdk/laravel-sync/issues"
+                "issues": "https://github.com/cboxdk/laravel-sync/issues",
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.1.1"
             },
-            "time": "2026-09-16T19:49:11+00:00"
+            "time": "2026-09-16T20:52:32+00:00"
         },
         {
             "name": "composer/pcre",

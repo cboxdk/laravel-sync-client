@@ -58,11 +58,5 @@
             "@license-check",
             "@security-audit"
         ]
-    },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/cboxdk/laravel-sync"
-        }
-    ]
+    }
 }
