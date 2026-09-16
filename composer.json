@@ -61,24 +61,8 @@
     },
     "repositories": [
         {
-            "type": "path",
-            "url": "../sync",
-            "options": {
-                "symlink": true,
-                "versions": {
-                    "cboxdk/sync": "0.3.0"
-                }
-            }
-        },
-        {
-            "type": "path",
-            "url": "../laravel-sync",
-            "options": {
-                "symlink": true,
-                "versions": {
-                    "cboxdk/laravel-sync": "0.1.0"
-                }
-            }
+            "type": "vcs",
+            "url": "https://github.com/cboxdk/laravel-sync"
         }
     ]
 }

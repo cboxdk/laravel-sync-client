@@ -1,7 +1,7 @@
 {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:4f8e19ff-f2b5-51ff-925f-96a254ef9cc7",
+    "serialNumber": "urn:uuid:de2684a9-3307-586f-9997-495d798e46ca",
     "version": 1,
     "metadata": {
         "component": {
@@ -90,12 +90,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/laravel-sync@0.1.0",
+            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.1.0",
             "group": "cboxdk",
             "name": "laravel-sync",
-            "version": "0.1.0",
+            "version": "v0.1.0",
             "scope": "optional",
-            "purl": "pkg:composer/cboxdk/laravel-sync@0.1.0",
+            "purl": "pkg:composer/cboxdk/laravel-sync@v0.1.0",
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "licenses": [
                 {
@@ -105,18 +105,22 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "../laravel-sync"
+                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/344300684a0b8638229b3e07bf061308ae42548b"
+                },
+                {
+                    "type": "vcs",
+                    "url": "https://github.com/cboxdk/laravel-sync.git"
                 }
             ]
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/sync@0.3.0",
+            "bom-ref": "pkg:composer/cboxdk/sync@v0.3.0",
             "group": "cboxdk",
             "name": "sync",
-            "version": "0.3.0",
+            "version": "v0.3.0",
             "scope": "required",
-            "purl": "pkg:composer/cboxdk/sync@0.3.0",
+            "purl": "pkg:composer/cboxdk/sync@v0.3.0",
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "licenses": [
                 {
@@ -126,7 +130,11 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "../sync"
+                    "url": "https://api.github.com/repos/cboxdk/sync/zipball/950cb6ff16c7796038e762447eb7aeaf9f1b9c02"
+                },
+                {
+                    "type": "vcs",
+                    "url": "https://github.com/cboxdk/sync.git"
                 }
             ]
         },

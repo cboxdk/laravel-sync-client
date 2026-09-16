@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f5b808548b1ebf4ac34e60041c0a45e0",
+    "content-hash": "944604df4e9cfb38a8fb2b66423fa965",
     "packages": [
         {
             "name": "brick/math",
@@ -141,11 +141,17 @@
         },
         {
             "name": "cboxdk/sync",
-            "version": "0.3.0",
+            "version": "v0.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/cboxdk/sync.git",
+                "reference": "950cb6ff16c7796038e762447eb7aeaf9f1b9c02"
+            },
             "dist": {
-                "type": "path",
-                "url": "../sync",
-                "reference": "050930093abb501d9c8fdd7c9b6c1adac16ab678"
+                "type": "zip",
+                "url": "https://api.github.com/repos/cboxdk/sync/zipball/950cb6ff16c7796038e762447eb7aeaf9f1b9c02",
+                "reference": "950cb6ff16c7796038e762447eb7aeaf9f1b9c02",
+                "shasum": ""
             },
             "require": {
                 "ext-pdo": "*",
@@ -162,70 +168,16 @@
                     "Cbox\\Sync\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Cbox\\Sync\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "pest"
-                ],
-                "lint": [
-                    "pint --test"
-                ],
-                "format": [
-                    "pint"
-                ],
-                "analyse": [
-                    "phpstan analyse --no-progress --memory-limit=1G"
-                ],
-                "license-check": [
-                    "@php bin/check-licenses.php"
-                ],
-                "sbom": [
-                    "@php bin/generate-sbom.php"
-                ],
-                "simulate": [
-                    "@php bin/simulate.php"
-                ],
-                "qa": [
-                    "@lint",
-                    "@analyse",
-                    "@test",
-                    "@test:rehydrating",
-                    "@test:sqlite",
-                    "@test:client",
-                    "@license-check",
-                    "@security-audit"
-                ],
-                "security-audit": [
-                    "@composer audit --locked"
-                ],
-                "docs:requirements": [
-                    "@php bin/generate-requirements.php"
-                ],
-                "test:rehydrating": [
-                    "SYNC_STORE=rehydrating pest"
-                ],
-                "test:sqlite": [
-                    "SYNC_STORE=sqlite pest"
-                ],
-                "concurrency": [
-                    "@php bin/concurrency.php"
-                ],
-                "test:client": [
-                    "SYNC_CLIENT=sqlite pest"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/cboxdk/sync/issues",
+                "source": "https://github.com/cboxdk/sync/tree/v0.3.0"
+            },
+            "time": "2026-09-16T19:05:37+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -6023,14 +5975,20 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "0.1.0",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/cboxdk/laravel-sync.git",
+                "reference": "344300684a0b8638229b3e07bf061308ae42548b"
+            },
             "dist": {
-                "type": "path",
-                "url": "../laravel-sync",
-                "reference": "2106ec39d005af26837605f0d9c1528eeb5bb1b4"
+                "type": "zip",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/344300684a0b8638229b3e07bf061308ae42548b",
+                "reference": "344300684a0b8638229b3e07bf061308ae42548b",
+                "shasum": ""
             },
             "require": {
-                "cboxdk/sync": "^0.2 || ^0.3",
+                "cboxdk/sync": "^0.3",
                 "ext-pdo": "*",
                 "illuminate/config": "^12.0 || ^13.0",
                 "illuminate/contracts": "^12.0 || ^13.0",
@@ -6099,10 +6057,11 @@
                 "MIT"
             ],
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.1.0",
+                "issues": "https://github.com/cboxdk/laravel-sync/issues"
+            },
+            "time": "2026-09-16T19:49:11+00:00"
         },
         {
             "name": "composer/pcre",
