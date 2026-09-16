@@ -1,0 +1,84 @@
+{
+    "name": "cboxdk/laravel-sync-client",
+    "description": "Client for Cbox Sync: a durable local replica, an outbox, and the retry semantics a device needs",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "ext-pdo": "*",
+        "cboxdk/sync": "^0.3",
+        "illuminate/config": "^12.0 || ^13.0",
+        "illuminate/contracts": "^12.0 || ^13.0",
+        "illuminate/http": "^12.0 || ^13.0",
+        "illuminate/support": "^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^3.5 || ^4.0",
+        "cboxdk/laravel-sync": "^0.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cbox\\Sync\\Client\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Cbox\\Sync\\Client\\Laravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Cbox\\Sync\\Client\\Laravel\\SyncClientServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "lint": "pint --test",
+        "format": "pint",
+        "analyse": "phpstan analyse --no-progress --memory-limit=1G",
+        "license-check": "@php bin/check-licenses.php",
+        "sbom": "@php bin/generate-sbom.php",
+        "docs:requirements": "@php bin/generate-requirements.php",
+        "security-audit": "@composer audit --locked",
+        "qa": [
+            "@lint",
+            "@analyse",
+            "@test",
+            "@license-check",
+            "@security-audit"
+        ]
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../sync",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "cboxdk/sync": "0.3.0"
+                }
+            }
+        },
+        {
+            "type": "path",
+            "url": "../laravel-sync",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "cboxdk/laravel-sync": "0.1.0"
+                }
+            }
+        }
+    ]
+}
