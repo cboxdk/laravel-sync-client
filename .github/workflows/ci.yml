@@ -12,7 +12,7 @@ jobs:
     name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/cboxdk/php-baseimages/php-cli:${{ matrix.php || '8.4' }}-bookworm-dev
+      image: ghcr.io/cboxdk/php-baseimages/php-cli:${{ matrix.php || '8.4' }}-bookworm
     strategy:
       fail-fast: false
       matrix:
