@@ -10,7 +10,7 @@ These are the runtime requirements enforced by `composer.json`.
 
 | Requirement | Version |
 | --- | --- |
-| `cboxdk/sync` | `^0.3` |
+| `cboxdk/sync` | `^0.4` |
 | PHP extension `pdo` | `*` |
 | `illuminate/config` | `^12.0 \|\| ^13.0` |
 | `illuminate/contracts` | `^12.0 \|\| ^13.0` |

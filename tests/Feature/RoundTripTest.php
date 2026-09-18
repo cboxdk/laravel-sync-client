@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Cbox\Sync\Data\FieldOperation as Op;
 use Cbox\Sync\Enums\MutationKind;
+use Cbox\Sync\Enums\MutationStatus;
 use Cbox\Sync\ValueObjects\EntityKey;
 
 function task(string $id): EntityKey
@@ -117,4 +118,43 @@ it('survives a restart with its queue and its synced state intact', function () 
     $restarted->pull('tasks', 'team-1');
 
     expect($restarted->replica()->record(task('t2'))?->value('title')->value())->toBe('queued');
+});
+
+it('reports what the server decided about each write, not just how many were sent', function () {
+    $client = $this->syncClientAs('alice');
+
+    $client->outbox()->queue(task('t1'), MutationKind::Create, [Op::set('title', 'fine'), Op::set('status', 'open')], 0);
+    // An update to something that does not exist: processed, and refused.
+    $client->outbox()->queue(task('ghost'), MutationKind::Update, [Op::set('title', 'nope')], 0);
+
+    $outcome = $client->push('tasks', 'team-1');
+
+    expect($outcome->sent)->toBe(2);
+    expect($outcome->abandoned)->toBe(0);
+
+    // "Sent" is not "saved". Without this an application cannot tell the user
+    // that something they typed never landed.
+    $attention = $outcome->needingAttention();
+    expect($attention)->toHaveCount(1);
+    expect($attention[0]->entityId)->toBe('ghost');
+    expect($attention[0]->status)->toBe(MutationStatus::Rejected);
+    expect($attention[0]->reason)->toBe('entity_not_found');
+});
+
+it('carries an offline write chain so a device does not conflict with itself', function () {
+    $client = $this->syncClientAs('alice');
+    $client->outbox()->queue(task('t1'), MutationKind::Create, [Op::set('title', 'first'), Op::set('status', 'open')], 0);
+    $client->push('tasks', 'team-1');
+    $client->pull('tasks', 'team-1');
+
+    // Two edits to the same field while offline, both from version 1. The
+    // second knows about the first, and says so.
+    $one = $client->outbox()->queue(task('t1'), MutationKind::Update, [Op::set('title', 'second')], 1);
+    $client->outbox()->queue(task('t1'), MutationKind::Update, [Op::set('title', 'third')], 1, dependsOn: $one->id);
+
+    $outcome = $client->push('tasks', 'team-1');
+
+    expect($outcome->needingAttention())->toBeEmpty();
+    $client->pull('tasks', 'team-1');
+    expect($client->replica()->record(task('t1'))?->value('title')->value())->toBe('third');
 });

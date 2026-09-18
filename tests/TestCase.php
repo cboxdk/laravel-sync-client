@@ -17,8 +17,11 @@ use Cbox\Sync\Client\Laravel\Tests\Fixtures\NodeType;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\TaskType;
 use Cbox\Sync\Client\Laravel\ViewIndex;
 use Cbox\Sync\Client\Outbox;
+use Cbox\Sync\Data\FieldOperation;
+use Cbox\Sync\Enums\MutationKind;
 use Cbox\Sync\Laravel\Api\Contracts\SyncPrincipals;
 use Cbox\Sync\Laravel\SyncServiceProvider;
+use Cbox\Sync\ValueObjects\EntityKey;
 use Cbox\Sync\ValueObjects\Replica;
 use Cbox\Sync\Views\MultiViewClient;
 use Orchestra\Testbench\TestCase as BaseTestCase;
@@ -103,7 +106,29 @@ class TestCase extends BaseTestCase
         );
     }
 
-    protected function outbox(): Outbox
+    /** @param \Closure(): SyncTransport $factory */
+    public function bindTransport(\Closure $factory): void
+    {
+        $this->app->bind(SyncTransport::class, $factory);
+        $this->app->forgetInstance(SyncClient::class);
+    }
+
+    public function syncClient(): SyncClient
+    {
+        return $this->app->make(SyncClient::class);
+    }
+
+    public function queueTask(string $id): void
+    {
+        $this->outbox()->queue(
+            new EntityKey('team-1', 'tasks', $id),
+            MutationKind::Create,
+            [FieldOperation::set('title', 'a')],
+            0,
+        );
+    }
+
+    public function outbox(): Outbox
     {
         return $this->app->make(Outbox::class);
     }

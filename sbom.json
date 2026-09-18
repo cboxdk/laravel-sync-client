@@ -1,7 +1,7 @@
 {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:e7ffca1f-4658-5014-807a-8f1bfefad10e",
+    "serialNumber": "urn:uuid:3f9c7234-a48f-5de5-a6dd-0511be86c3d4",
     "version": 1,
     "metadata": {
         "component": {
@@ -90,12 +90,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.1.1",
+            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.2.0",
             "group": "cboxdk",
             "name": "laravel-sync",
-            "version": "v0.1.1",
+            "version": "v0.2.0",
             "scope": "optional",
-            "purl": "pkg:composer/cboxdk/laravel-sync@v0.1.1",
+            "purl": "pkg:composer/cboxdk/laravel-sync@v0.2.0",
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "licenses": [
                 {
@@ -105,7 +105,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/58419a9fa4b1a24277190a23927beab4b183f55d"
+                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250"
                 },
                 {
                     "type": "vcs",
@@ -115,12 +115,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/sync@v0.3.0",
+            "bom-ref": "pkg:composer/cboxdk/sync@v0.4.0",
             "group": "cboxdk",
             "name": "sync",
-            "version": "v0.3.0",
+            "version": "v0.4.0",
             "scope": "required",
-            "purl": "pkg:composer/cboxdk/sync@v0.3.0",
+            "purl": "pkg:composer/cboxdk/sync@v0.4.0",
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "licenses": [
                 {
@@ -130,7 +130,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/cboxdk/sync/zipball/950cb6ff16c7796038e762447eb7aeaf9f1b9c02"
+                    "url": "https://api.github.com/repos/cboxdk/sync/zipball/9c04aa8422edef914d465e976733707145fcce7b"
                 },
                 {
                     "type": "vcs",
@@ -415,12 +415,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/filp/whoops@2.18.4",
+            "bom-ref": "pkg:composer/filp/whoops@2.18.5",
             "group": "filp",
             "name": "whoops",
-            "version": "2.18.4",
+            "version": "2.18.5",
             "scope": "optional",
-            "purl": "pkg:composer/filp/whoops@2.18.4",
+            "purl": "pkg:composer/filp/whoops@2.18.5",
             "description": "php error handling for cool kids",
             "licenses": [
                 {
@@ -430,7 +430,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/filp/whoops/zipball/d2102955e48b9fd9ab24280a7ad12ed552752c4d"
+                    "url": "https://api.github.com/repos/filp/whoops/zipball/baec851ad6ae00db8bd0fdd30d208afc1b71c56e"
                 },
                 {
                     "type": "vcs",

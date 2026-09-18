@@ -45,6 +45,12 @@ class Wire
             'atomic' => $mutation->atomic,
             'operations' => $operations,
         ];
+        if ($mutation->dependsOn !== null) {
+            // How two offline edits to the same field say the second knows
+            // about the first. Omitting it made the engine's own support for
+            // an offline write chain unreachable from a client.
+            $body['depends_on'] = $mutation->dependsOn;
+        }
         if ($mutation->expectedVersion !== null) {
             $body['expected_version'] = $mutation->expectedVersion->value;
         }

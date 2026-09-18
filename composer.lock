@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c7f8a7bb9e186422a1d7feb1f481246f",
+    "content-hash": "c71f93b2a965f0ac4161dde586083923",
     "packages": [
         {
             "name": "brick/math",
@@ -141,16 +141,16 @@
         },
         {
             "name": "cboxdk/sync",
-            "version": "v0.3.0",
+            "version": "v0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/sync.git",
-                "reference": "950cb6ff16c7796038e762447eb7aeaf9f1b9c02"
+                "reference": "9c04aa8422edef914d465e976733707145fcce7b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/sync/zipball/950cb6ff16c7796038e762447eb7aeaf9f1b9c02",
-                "reference": "950cb6ff16c7796038e762447eb7aeaf9f1b9c02",
+                "url": "https://api.github.com/repos/cboxdk/sync/zipball/9c04aa8422edef914d465e976733707145fcce7b",
+                "reference": "9c04aa8422edef914d465e976733707145fcce7b",
                 "shasum": ""
             },
             "require": {
@@ -175,9 +175,9 @@
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "support": {
                 "issues": "https://github.com/cboxdk/sync/issues",
-                "source": "https://github.com/cboxdk/sync/tree/v0.3.0"
+                "source": "https://github.com/cboxdk/sync/tree/v0.4.0"
             },
-            "time": "2026-09-16T19:05:37+00:00"
+            "time": "2026-09-18T19:25:23+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -5975,20 +5975,20 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "v0.1.1",
+            "version": "v0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/laravel-sync.git",
-                "reference": "58419a9fa4b1a24277190a23927beab4b183f55d"
+                "reference": "08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/58419a9fa4b1a24277190a23927beab4b183f55d",
-                "reference": "58419a9fa4b1a24277190a23927beab4b183f55d",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250",
+                "reference": "08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250",
                 "shasum": ""
             },
             "require": {
-                "cboxdk/sync": "^0.3",
+                "cboxdk/sync": "^0.4",
                 "ext-pdo": "*",
                 "illuminate/config": "^12.0 || ^13.0",
                 "illuminate/contracts": "^12.0 || ^13.0",
@@ -6022,9 +6022,9 @@
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "support": {
                 "issues": "https://github.com/cboxdk/laravel-sync/issues",
-                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.1.1"
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.2.0"
             },
-            "time": "2026-09-16T20:52:32+00:00"
+            "time": "2026-09-18T19:30:53+00:00"
         },
         {
             "name": "composer/pcre",
@@ -6419,16 +6419,16 @@
         },
         {
             "name": "filp/whoops",
-            "version": "2.18.4",
+            "version": "2.18.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/filp/whoops.git",
-                "reference": "d2102955e48b9fd9ab24280a7ad12ed552752c4d"
+                "reference": "baec851ad6ae00db8bd0fdd30d208afc1b71c56e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/filp/whoops/zipball/d2102955e48b9fd9ab24280a7ad12ed552752c4d",
-                "reference": "d2102955e48b9fd9ab24280a7ad12ed552752c4d",
+                "url": "https://api.github.com/repos/filp/whoops/zipball/baec851ad6ae00db8bd0fdd30d208afc1b71c56e",
+                "reference": "baec851ad6ae00db8bd0fdd30d208afc1b71c56e",
                 "shasum": ""
             },
             "require": {
@@ -6437,8 +6437,8 @@
             },
             "require-dev": {
                 "mockery/mockery": "^1.0",
-                "phpunit/phpunit": "^7.5.20 || ^8.5.8 || ^9.3.3",
-                "symfony/var-dumper": "^4.0 || ^5.0"
+                "phpunit/phpunit": "^7.5.20 || ^8.5.8 || ^9.3.3 || ^10.5.58",
+                "symfony/var-dumper": "^4.0 || ^5.0 || ^6.0 || ^7.0 || ^8.0"
             },
             "suggest": {
                 "symfony/var-dumper": "Pretty print complex values better with var-dumper available",
@@ -6478,7 +6478,7 @@
             ],
             "support": {
                 "issues": "https://github.com/filp/whoops/issues",
-                "source": "https://github.com/filp/whoops/tree/2.18.4"
+                "source": "https://github.com/filp/whoops/tree/2.18.5"
             },
             "funding": [
                 {
@@ -6486,7 +6486,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-08-08T12:00:00+00:00"
+            "time": "2026-09-18T12:00:00+00:00"
         },
         {
             "name": "hamcrest/hamcrest-php",
