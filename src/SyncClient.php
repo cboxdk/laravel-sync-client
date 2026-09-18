@@ -173,9 +173,49 @@ class SyncClient
      *
      * A reset is honoured rather than retried. It means this device's local
      * state for that view can no longer be trusted, so continuing to apply
-     * pages onto it would be building on sand.
+     * pages onto it would be building on sand. Local knowledge for the view is
+     * dropped and the view is rebuilt from a fresh bootstrap.
+     *
+     * The rebuild is attempted exactly once. A second reset means the server
+     * changed the view again while this device was rebuilding it, and retrying
+     * in a loop would spin against a moving target rather than letting the
+     * application decide to back off.
      */
     public function pull(string $type, ?string $scope = null, int $pageSize = 100): void
+    {
+        try {
+            $this->follow($type, $scope, $pageSize);
+        } catch (Exceptions\SyncRequestFailed $failed) {
+            if (! $failed->requiresReset()) {
+                throw $failed;
+            }
+
+            $this->resetView($type, $scope);
+            $this->follow($type, $scope, $pageSize);
+        }
+    }
+
+    /**
+     * Forget everything this device knows about one view.
+     *
+     * The replica is reset before the index entry is dropped. The other order
+     * loses the fingerprint that finds the context, and the memberships that
+     * context names are then unreachable for good.
+     */
+    private function resetView(string $type, ?string $scope): void
+    {
+        $fingerprint = $this->views->fingerprint($type, $scope);
+        if ($fingerprint !== null) {
+            $context = $this->replica->contextFor($fingerprint);
+            if ($context !== null) {
+                $this->replica->resetView($context);
+            }
+        }
+
+        $this->views->forget($type, $scope);
+    }
+
+    private function follow(string $type, ?string $scope, int $pageSize): void
     {
         $request = ['type' => $type, 'scope' => $scope];
         $cursor = $this->resume($type, $scope);
