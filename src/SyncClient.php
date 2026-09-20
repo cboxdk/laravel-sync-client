@@ -11,6 +11,7 @@ use Cbox\Sync\Client\Laravel\ValueObjects\SyncResponse;
 use Cbox\Sync\Client\Outbox;
 use Cbox\Sync\Data\Mutation;
 use Cbox\Sync\Enums\MutationStatus;
+use Cbox\Sync\ValueObjects\EntityKey;
 use Cbox\Sync\Views\BootstrapToken;
 use Cbox\Sync\Views\MultiViewClient;
 use Cbox\Sync\Views\ViewCursor;
@@ -52,6 +53,7 @@ class SyncClient
         $abandoned = 0;
         $resumed = null;
         $outcomes = [];
+        $named = [];
 
         // Only this type's queue. The outbox holds every write this device has
         // made, and the wire payload carries no type of its own - the server
@@ -66,7 +68,7 @@ class SyncClient
                 // timeout, an empty body. The queue is left exactly as it is.
                 // Acknowledging would lose the write; abandoning would lose it
                 // permanently, and a transient outage would drain everything.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes);
+                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named);
             }
 
             if ($status === 'mutation_gap') {
@@ -77,7 +79,7 @@ class SyncClient
                 // never help, and looping against a live server is far worse
                 // than stopping and letting the caller see it.
                 if ($resumed === $acknowledged) {
-                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes);
+                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named);
                 }
                 $resumed = $acknowledged;
                 $this->outbox->resumeAfter($mutation, $acknowledged);
@@ -89,6 +91,10 @@ class SyncClient
             if ($status === 'processed') {
                 $outcomes[] = $this->outcome($mutation, $response);
                 $this->outbox->acknowledged($mutation);
+                $rename = $this->named($mutation, $response);
+                if ($rename !== null) {
+                    $named[] = $rename;
+                }
                 $sent++;
 
                 continue;
@@ -97,7 +103,7 @@ class SyncClient
             if ($status === 'retry') {
                 // Retrying is safe only under the same identity, so the queue
                 // stays untouched and in order.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes);
+                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named);
             }
 
             // Terminal for this identity. It leaves the queue rather than
@@ -107,7 +113,29 @@ class SyncClient
             $abandoned++;
         }
 
-        return new PushOutcome($sent, $abandoned, retryLater: false, outcomes: $outcomes);
+        return new PushOutcome($sent, $abandoned, retryLater: false, outcomes: $outcomes, named: $named);
+    }
+
+    /**
+     * A create went out under a handle the device made up, and the server
+     * answered with the name it gave the record.
+     *
+     * Everything still queued behind that create refers to the handle and would
+     * be a write to a record that does not exist, so the queue is renamed here.
+     * The replica is untouched on purpose: it only ever holds records that came
+     * back from the server, so it never knew the handle.
+     */
+    private function named(Mutation $mutation, SyncResponse $response): ?ValueObjects\RecordNamed
+    {
+        $name = $response->body->id ?? null;
+        if (! is_string($name) || $name === '' || $name === $mutation->entity->id) {
+            return null;
+        }
+
+        $named = new EntityKey($mutation->entity->space, $mutation->entity->type, $name);
+        $this->outbox->rekey($mutation->entity, $named);
+
+        return new ValueObjects\RecordNamed($mutation->entity, $named);
     }
 
     private function outcome(Mutation $mutation, SyncResponse $response): ValueObjects\MutationOutcome

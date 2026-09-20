@@ -9,19 +9,36 @@ readonly class PushOutcome
     /** @var list<MutationOutcome> */
     public array $outcomes;
 
-    /** @param list<MutationOutcome> $outcomes */
+    /**
+     * Records the server named, for creates that went out under a handle.
+     *
+     * @var list<RecordNamed>
+     */
+    public array $named;
+
+    /**
+     * @param  list<MutationOutcome>  $outcomes
+     * @param  list<RecordNamed>  $named
+     */
     public function __construct(
         public int $sent,
         public int $abandoned,
         /** The server asked us to come back; the queue is untouched and still in order. */
         public bool $retryLater,
         array $outcomes = [],
+        array $named = [],
     ) {
         $copy = [];
         foreach ($outcomes as $outcome) {
             $copy[] = $outcome;
         }
         $this->outcomes = $copy;
+
+        $names = [];
+        foreach ($named as $rename) {
+            $names[] = $rename;
+        }
+        $this->named = $names;
     }
 
     /**

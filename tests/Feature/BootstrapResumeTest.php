@@ -16,11 +16,11 @@ use Cbox\Sync\ValueObjects\EntityKey;
  */
 it('resumes an interrupted bootstrap instead of starting a new one', function () {
     foreach (['n1', 'n2', 'n3'] as $index => $id) {
-        $this->outbox()->queue(new EntityKey('team-1', 'nodes', $id), MutationKind::Create, [
+        $this->outbox()->queue($this->named(new EntityKey('team-1', 'nodes', $id)), MutationKind::Create, [
             Op::set('parent_id', 'p1'), Op::set('name', 'node '.$id),
         ], 0);
     }
-    $this->syncClientAs('alice')->push('nodes', 'p1');
+    $this->drain($this->syncClientAs('alice'), 'nodes', 'p1');
 
     // Page one only, then the process dies.
     $this->bindTransport(fn (): SyncTransport => new class($this->app) implements SyncTransport
@@ -52,6 +52,6 @@ it('resumes an interrupted bootstrap instead of starting a new one', function ()
     $resumed->pull('nodes', 'p1', pageSize: 1);
 
     foreach (['n1', 'n2', 'n3'] as $id) {
-        expect($resumed->replica()->record(new EntityKey('team-1', 'nodes', $id)))->not->toBeNull();
+        expect($resumed->replica()->record($this->named(new EntityKey('team-1', 'nodes', $id))))->not->toBeNull();
     }
 });

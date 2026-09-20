@@ -17,11 +17,11 @@ it('writes offline, drains the queue, and reads its own write back', function ()
     $outbox = $this->outbox();
 
     // Offline: nothing is sent, everything is queued and durable.
-    $outbox->queue(task('t1'), MutationKind::Create, [Op::set('title', 'Ship it'), Op::set('status', 'open')], 0);
-    $outbox->queue(task('t2'), MutationKind::Create, [Op::set('title', 'Later'), Op::set('status', 'open')], 0);
+    $outbox->queue($this->named(task('t1')), MutationKind::Create, [Op::set('title', 'Ship it'), Op::set('status', 'open')], 0);
+    $outbox->queue($this->named(task('t2')), MutationKind::Create, [Op::set('title', 'Later'), Op::set('status', 'open')], 0);
     expect($outbox->pending())->toBe(2);
 
-    $outcome = $client->push('tasks', 'team-1');
+    $outcome = $this->drain($client, 'tasks', 'team-1');
 
     expect($outcome->sent)->toBe(2);
     expect($outcome->abandoned)->toBe(0);
@@ -30,16 +30,16 @@ it('writes offline, drains the queue, and reads its own write back', function ()
 
     $client->pull('tasks', 'team-1');
 
-    expect($client->replica()->record(task('t1'))?->value('title')->value())->toBe('Ship it');
-    expect($client->replica()->record(task('t2'))?->value('title')->value())->toBe('Later');
+    expect($client->replica()->record($this->named(task('t1')))?->value('title')->value())->toBe('Ship it');
+    expect($client->replica()->record($this->named(task('t2')))?->value('title')->value())->toBe('Later');
 });
 
 it('follows deltas after the first sync instead of bootstrapping again', function () {
     $client = $this->syncClientAs('alice');
     $outbox = $this->outbox();
 
-    $outbox->queue(task('t1'), MutationKind::Create, [Op::set('title', 'first'), Op::set('status', 'open')], 0);
-    $client->push('tasks', 'team-1');
+    $outbox->queue($this->named(task('t1')), MutationKind::Create, [Op::set('title', 'first'), Op::set('status', 'open')], 0);
+    $this->drain($client, 'tasks', 'team-1');
     $client->pull('tasks', 'team-1');
 
     // A second device changes it behind our back.
@@ -47,11 +47,11 @@ it('follows deltas after the first sync instead of bootstrapping again', functio
     $this->outbox();
     $other->pull('tasks', 'team-1');
 
-    $outbox->queue(task('t1'), MutationKind::Update, [Op::set('title', 'second')], 1);
-    $client->push('tasks', 'team-1');
+    $outbox->queue($this->named(task('t1')), MutationKind::Update, [Op::set('title', 'second')], 1);
+    $this->drain($client, 'tasks', 'team-1');
     $client->pull('tasks', 'team-1');
 
-    expect($client->replica()->record(task('t1'))?->value('title')->value())->toBe('second');
+    expect($client->replica()->record($this->named(task('t1')))?->value('title')->value())->toBe('second');
 });
 
 it('drops a write the server refuses instead of wedging the queue behind it', function () {
@@ -59,10 +59,10 @@ it('drops a write the server refuses instead of wedging the queue behind it', fu
     $outbox = $this->outbox();
 
     // `secret` is readable but not writable, so the server refuses this one.
-    $outbox->queue(task('t1'), MutationKind::Create, [Op::set('secret', 'nope'), Op::set('status', 'open')], 0);
-    $outbox->queue(task('t2'), MutationKind::Create, [Op::set('title', 'fine'), Op::set('status', 'open')], 0);
+    $outbox->queue($this->named(task('t1')), MutationKind::Create, [Op::set('secret', 'nope'), Op::set('status', 'open')], 0);
+    $outbox->queue($this->named(task('t2')), MutationKind::Create, [Op::set('title', 'fine'), Op::set('status', 'open')], 0);
 
-    $outcome = $client->push('tasks', 'team-1');
+    $outcome = $this->drain($client, 'tasks', 'team-1');
 
     expect($outcome->abandoned)->toBe(1);
     expect($outcome->sent)->toBe(1);
@@ -71,20 +71,20 @@ it('drops a write the server refuses instead of wedging the queue behind it', fu
 
     // The good write behind it still landed.
     $client->pull('tasks', 'team-1');
-    expect($client->replica()->record(task('t2'))?->value('title')->value())->toBe('fine');
+    expect($client->replica()->record($this->named(task('t2')))?->value('title')->value())->toBe('fine');
 });
 
 it('keeps a conflicting write and still counts it as sent', function () {
     $alice = $this->syncClientAs('alice');
-    $this->outbox()->queue(task('t1'), MutationKind::Create, [Op::set('title', 'draft'), Op::set('status', 'open')], 0);
-    $this->outbox()->queue(task('t1'), MutationKind::Update, [Op::set('title', 'from alice')], 1);
-    $alice->push('tasks', 'team-1');
+    $this->outbox()->queue($this->named(task('t1')), MutationKind::Create, [Op::set('title', 'draft'), Op::set('status', 'open')], 0);
+    $this->outbox()->queue($this->named(task('t1')), MutationKind::Update, [Op::set('title', 'from alice')], 1);
+    $this->drain($alice, 'tasks', 'team-1');
 
     // A genuinely separate device, offline since version 1, writes the same field.
     $bob = $this->secondDevice('bob', 'device-2');
-    $bob->outbox()->queue(task('t1'), MutationKind::Update, [Op::set('title', 'from bob')], 1);
+    $bob->outbox()->queue($this->named(task('t1')), MutationKind::Update, [Op::set('title', 'from bob')], 1);
 
-    $outcome = $bob->push('tasks', 'team-1');
+    $outcome = $this->drain($bob, 'tasks', 'team-1');
 
     // A conflict is an answer, not a failure: the mutation is done either way,
     // and the competing proposal is preserved on the server rather than lost.
@@ -93,41 +93,41 @@ it('keeps a conflicting write and still counts it as sent', function () {
     expect($outcome->retryLater)->toBeFalse();
 
     $alice->pull('tasks', 'team-1');
-    expect($alice->replica()->record(task('t1'))?->value('title')->value())->toBe('from alice');
+    expect($alice->replica()->record($this->named(task('t1')))?->value('title')->value())->toBe('from alice');
 });
 
 it('survives a restart with its queue and its synced state intact', function () {
     $client = $this->syncClientAs('alice');
     $outbox = $this->outbox();
 
-    $outbox->queue(task('t1'), MutationKind::Create, [Op::set('title', 'synced'), Op::set('status', 'open')], 0);
-    $client->push('tasks', 'team-1');
+    $outbox->queue($this->named(task('t1')), MutationKind::Create, [Op::set('title', 'synced'), Op::set('status', 'open')], 0);
+    $this->drain($client, 'tasks', 'team-1');
     $client->pull('tasks', 'team-1');
 
     // Queue a write, then "lose the process" before it is ever sent.
-    $outbox->queue(task('t2'), MutationKind::Create, [Op::set('title', 'queued'), Op::set('status', 'open')], 0);
+    $outbox->queue($this->named(task('t2')), MutationKind::Create, [Op::set('title', 'queued'), Op::set('status', 'open')], 0);
     $this->restartDevice();
 
     $restarted = $this->syncClientAs('alice');
 
     // It still knows what it synced, and still has the write it never sent.
-    expect($restarted->replica()->record(task('t1'))?->value('title')->value())->toBe('synced');
+    expect($restarted->replica()->record($this->named(task('t1')))?->value('title')->value())->toBe('synced');
     expect($this->outbox()->pending())->toBe(1);
 
-    $restarted->push('tasks', 'team-1');
+    $this->drain($restarted, 'tasks', 'team-1');
     $restarted->pull('tasks', 'team-1');
 
-    expect($restarted->replica()->record(task('t2'))?->value('title')->value())->toBe('queued');
+    expect($restarted->replica()->record($this->named(task('t2')))?->value('title')->value())->toBe('queued');
 });
 
 it('reports what the server decided about each write, not just how many were sent', function () {
     $client = $this->syncClientAs('alice');
 
-    $client->outbox()->queue(task('t1'), MutationKind::Create, [Op::set('title', 'fine'), Op::set('status', 'open')], 0);
+    $client->outbox()->queue($this->named(task('t1')), MutationKind::Create, [Op::set('title', 'fine'), Op::set('status', 'open')], 0);
     // An update to something that does not exist: processed, and refused.
-    $client->outbox()->queue(task('ghost'), MutationKind::Update, [Op::set('title', 'nope')], 0);
+    $client->outbox()->queue($this->named(task('ghost')), MutationKind::Update, [Op::set('title', 'nope')], 0);
 
-    $outcome = $client->push('tasks', 'team-1');
+    $outcome = $this->drain($client, 'tasks', 'team-1');
 
     expect($outcome->sent)->toBe(2);
     expect($outcome->abandoned)->toBe(0);
@@ -143,18 +143,18 @@ it('reports what the server decided about each write, not just how many were sen
 
 it('carries an offline write chain so a device does not conflict with itself', function () {
     $client = $this->syncClientAs('alice');
-    $client->outbox()->queue(task('t1'), MutationKind::Create, [Op::set('title', 'first'), Op::set('status', 'open')], 0);
-    $client->push('tasks', 'team-1');
+    $client->outbox()->queue($this->named(task('t1')), MutationKind::Create, [Op::set('title', 'first'), Op::set('status', 'open')], 0);
+    $this->drain($client, 'tasks', 'team-1');
     $client->pull('tasks', 'team-1');
 
     // Two edits to the same field while offline, both from version 1. The
     // second knows about the first, and says so.
-    $one = $client->outbox()->queue(task('t1'), MutationKind::Update, [Op::set('title', 'second')], 1);
-    $client->outbox()->queue(task('t1'), MutationKind::Update, [Op::set('title', 'third')], 1, dependsOn: $one->id);
+    $one = $client->outbox()->queue($this->named(task('t1')), MutationKind::Update, [Op::set('title', 'second')], 1);
+    $client->outbox()->queue($this->named(task('t1')), MutationKind::Update, [Op::set('title', 'third')], 1, dependsOn: $one->id);
 
-    $outcome = $client->push('tasks', 'team-1');
+    $outcome = $this->drain($client, 'tasks', 'team-1');
 
     expect($outcome->needingAttention())->toBeEmpty();
     $client->pull('tasks', 'team-1');
-    expect($client->replica()->record(task('t1'))?->value('title')->value())->toBe('third');
+    expect($client->replica()->record($this->named(task('t1')))?->value('title')->value())->toBe('third');
 });

@@ -14,24 +14,24 @@ use Cbox\Sync\ValueObjects\EntityKey;
 it('never sends a queued write as a different entity type', function () {
     $client = $this->syncClientAs('alice');
 
-    $client->outbox()->queue(new EntityKey('team-1', 'tasks', 't1'), MutationKind::Create, [
+    $client->outbox()->queue($this->named(new EntityKey('team-1', 'tasks', 't1')), MutationKind::Create, [
         Op::set('title', 'a task'), Op::set('status', 'open'),
     ], 0);
-    $client->outbox()->queue(new EntityKey('team-1', 'nodes', 'n1'), MutationKind::Create, [
+    $client->outbox()->queue($this->named(new EntityKey('team-1', 'nodes', 'n1')), MutationKind::Create, [
         Op::set('name', 'a node'), Op::set('parent_id', 'p1'),
     ], 0);
 
-    $client->push('tasks', 'team-1');
+    $this->drain($client, 'tasks', 'team-1');
 
     $store = app(Store::class);
     // The node must not have been created as a task under its own id.
-    expect($store->record(new EntityKey('team-1', 'tasks', 'n1')))->toBeNull();
-    expect($store->record(new EntityKey('team-1', 'tasks', 't1')))->not->toBeNull();
+    expect($store->record($this->named(new EntityKey('team-1', 'tasks', 'n1'))))->toBeNull();
+    expect($store->record($this->named(new EntityKey('team-1', 'tasks', 't1'))))->not->toBeNull();
 
     // And it must still be queued, waiting for a push that names its type.
     expect($client->outbox()->pending())->toBe(1);
 
-    $client->push('nodes', 'p1');
-    expect($store->record(new EntityKey('team-1', 'nodes', 'n1')))->not->toBeNull();
+    $this->drain($client, 'nodes', 'p1');
+    expect($store->record($this->named(new EntityKey('team-1', 'nodes', 'n1'))))->not->toBeNull();
     expect($client->outbox()->pending())->toBe(0);
 });

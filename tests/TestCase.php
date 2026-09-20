@@ -15,6 +15,7 @@ use Cbox\Sync\Client\Laravel\Tests\Fixtures\HeaderPrincipals;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\KernelTransport;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\NodeType;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\TaskType;
+use Cbox\Sync\Client\Laravel\ValueObjects\PushOutcome;
 use Cbox\Sync\Client\Laravel\ViewIndex;
 use Cbox\Sync\Client\Outbox;
 use Cbox\Sync\Data\FieldOperation;
@@ -121,7 +122,7 @@ class TestCase extends BaseTestCase
     public function queueTask(string $id): void
     {
         $this->outbox()->queue(
-            new EntityKey('team-1', 'tasks', $id),
+            $this->named(new EntityKey('team-1', 'tasks', $id)),
             MutationKind::Create,
             [FieldOperation::set('title', 'a')],
             0,
@@ -131,6 +132,33 @@ class TestCase extends BaseTestCase
     public function outbox(): Outbox
     {
         return $this->app->make(Outbox::class);
+    }
+
+    /** @var array<string, string> The handle a create went out under => the name the server gave it. */
+    protected array $serverNames = [];
+
+    /**
+     * Push, and remember what the server named anything this device created.
+     *
+     * A create only ever carries a handle the device made up; the record is
+     * called whatever the server says. Tests that look a record up afterwards
+     * have to ask by that name, which is exactly what an application does with
+     * PushOutcome::$named.
+     */
+    protected function drain(SyncClient $client, string $type, ?string $scope = null): PushOutcome
+    {
+        $outcome = $client->push($type, $scope);
+        foreach ($outcome->named as $rename) {
+            $this->serverNames[$rename->handle->id] = $rename->named->id;
+        }
+
+        return $outcome;
+    }
+
+    /** The key a record this device created is actually stored under. */
+    protected function named(EntityKey $handle): EntityKey
+    {
+        return new EntityKey($handle->space, $handle->type, $this->serverNames[$handle->id] ?? $handle->id);
     }
 
     protected function defineDatabaseMigrations(): void
