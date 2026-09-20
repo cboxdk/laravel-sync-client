@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0 - 2026-09-20
+
+### Added (breaking)
+
+- **The client follows the name the server gives a record.** A create goes out under a handle the device made up for itself, because an id a client chooses is attacker-controlled input in a key position. The server answers with the name it actually gave the record, and everything still queued behind that create refers to the handle - left alone, each of those is a write to a record that does not exist.
+
+  `push()` renames the queue and reports what happened in `PushOutcome::$named`. The replica is deliberately untouched: it only ever holds records that came back from the server, so it never knew the handle.
+
+  What the package cannot do is move a field VALUE holding the handle - a child carrying its parent's id - because no library can know which of an application's fields are references. That is why the rename is reported rather than hidden: the application has to move what it stored under the handle, on screen or on disk.
+
+  **Breaking:** `PushOutcome` gains a constructor parameter, and a create's record is no longer stored under the id the caller queued it with.
+
+### Changed
+
+- Requires `cboxdk/sync` `^0.6` for the outbox rename, and tests against `cboxdk/laravel-sync` `^0.4`.
+
 ## 0.1.1 - 2026-09-20
 
 ### Fixed

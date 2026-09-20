@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2c373be52fa1a2df937357f5f1b07bf5",
+    "content-hash": "7348f315530b1f3dc5817e07de641d8d",
     "packages": [
         {
             "name": "brick/math",
@@ -141,16 +141,16 @@
         },
         {
             "name": "cboxdk/sync",
-            "version": "v0.5.0",
+            "version": "v0.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/sync.git",
-                "reference": "6151aada73e7fc08c076bdbd23d7c29745e2164f"
+                "reference": "e67cb4f33067e1e6fd31c8fca6029be497f714fd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/sync/zipball/6151aada73e7fc08c076bdbd23d7c29745e2164f",
-                "reference": "6151aada73e7fc08c076bdbd23d7c29745e2164f",
+                "url": "https://api.github.com/repos/cboxdk/sync/zipball/e67cb4f33067e1e6fd31c8fca6029be497f714fd",
+                "reference": "e67cb4f33067e1e6fd31c8fca6029be497f714fd",
                 "shasum": ""
             },
             "require": {
@@ -175,9 +175,9 @@
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "support": {
                 "issues": "https://github.com/cboxdk/sync/issues",
-                "source": "https://github.com/cboxdk/sync/tree/v0.5.0"
+                "source": "https://github.com/cboxdk/sync/tree/v0.6.0"
             },
-            "time": "2026-09-20T07:00:58+00:00"
+            "time": "2026-09-20T19:57:46+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -5975,20 +5975,20 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "v0.3.0",
+            "version": "v0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/laravel-sync.git",
-                "reference": "617fbf6d76038a435d6d4b44c9983e4cbadc648a"
+                "reference": "6a9186f66e1e74f13f79e3a7e77e3952dfd14421"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/617fbf6d76038a435d6d4b44c9983e4cbadc648a",
-                "reference": "617fbf6d76038a435d6d4b44c9983e4cbadc648a",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/6a9186f66e1e74f13f79e3a7e77e3952dfd14421",
+                "reference": "6a9186f66e1e74f13f79e3a7e77e3952dfd14421",
                 "shasum": ""
             },
             "require": {
-                "cboxdk/sync": "^0.5",
+                "cboxdk/sync": "^0.5 || ^0.6",
                 "ext-pdo": "*",
                 "illuminate/config": "^12.0 || ^13.0",
                 "illuminate/contracts": "^12.0 || ^13.0",
@@ -6025,9 +6025,9 @@
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "support": {
                 "issues": "https://github.com/cboxdk/laravel-sync/issues",
-                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.3.0"
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.4.0"
             },
-            "time": "2026-09-20T07:09:00+00:00"
+            "time": "2026-09-20T19:59:08+00:00"
         },
         {
             "name": "composer/pcre",
