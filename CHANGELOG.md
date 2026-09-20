@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1 - 2026-09-20
+
+### Fixed
+
+- **A reset bricked the device instead of rebuilding it.** `SyncRequestFailed::requiresReset()`, `MultiViewClient::resetView()` and `ViewIndex::forget()` all existed and none of them was ever called: every non-2xx threw straight out of `pull()`, including the 409 that means "your local state for this view is no longer valid". So retention running past a slow device's cursor, an epoch rotation, or a changed view filter each made `pull()` throw on every sync from then on, with no recovery short of deleting the replica database by hand - and epoch rotation is the documented lever for forcing a rebuild.
+
+  `pull()` now catches a reset, drops the view's memberships, cursor and index entry, and rebuilds from a fresh bootstrap. The replica is reset before the index entry is dropped: the other order loses the fingerprint that finds the context, and the memberships it names are then unreachable. The rebuild is attempted once - a second reset means the view changed again mid-rebuild, and retrying in a loop would spin against a moving target rather than letting the application back off.
+
+### Added
+
+- `docs/core-concepts/resets.md` - what causes a reset, what the client handles on its own, and the one case it hands back.
+
+### Changed
+
+- Allows `cboxdk/sync` `^0.5`. The client uses nothing added in 0.5, so both lines resolve; widened rather than moved, because pinning it forward would force the engine version on an application that has not moved its server side yet.
+
 ## 0.1.0 - 2026-09-18
 
 ### Initial release
