@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "17be7f03821f6e631e566e228769fea6",
+    "content-hash": "2c373be52fa1a2df937357f5f1b07bf5",
     "packages": [
         {
             "name": "brick/math",
@@ -141,16 +141,16 @@
         },
         {
             "name": "cboxdk/sync",
-            "version": "v0.4.0",
+            "version": "v0.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/sync.git",
-                "reference": "9c04aa8422edef914d465e976733707145fcce7b"
+                "reference": "6151aada73e7fc08c076bdbd23d7c29745e2164f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/sync/zipball/9c04aa8422edef914d465e976733707145fcce7b",
-                "reference": "9c04aa8422edef914d465e976733707145fcce7b",
+                "url": "https://api.github.com/repos/cboxdk/sync/zipball/6151aada73e7fc08c076bdbd23d7c29745e2164f",
+                "reference": "6151aada73e7fc08c076bdbd23d7c29745e2164f",
                 "shasum": ""
             },
             "require": {
@@ -175,9 +175,9 @@
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "support": {
                 "issues": "https://github.com/cboxdk/sync/issues",
-                "source": "https://github.com/cboxdk/sync/tree/v0.4.0"
+                "source": "https://github.com/cboxdk/sync/tree/v0.5.0"
             },
-            "time": "2026-09-18T19:25:23+00:00"
+            "time": "2026-09-20T07:00:58+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -5975,26 +5975,29 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "v0.2.0",
+            "version": "v0.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/laravel-sync.git",
-                "reference": "08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250"
+                "reference": "617fbf6d76038a435d6d4b44c9983e4cbadc648a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250",
-                "reference": "08ca3bbcb76b5cc4226d8a2ab8bd51783b78d250",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/617fbf6d76038a435d6d4b44c9983e4cbadc648a",
+                "reference": "617fbf6d76038a435d6d4b44c9983e4cbadc648a",
                 "shasum": ""
             },
             "require": {
-                "cboxdk/sync": "^0.4",
+                "cboxdk/sync": "^0.5",
                 "ext-pdo": "*",
                 "illuminate/config": "^12.0 || ^13.0",
                 "illuminate/contracts": "^12.0 || ^13.0",
                 "illuminate/database": "^12.0 || ^13.0",
+                "illuminate/http": "^12.0 || ^13.0",
+                "illuminate/routing": "^12.0 || ^13.0",
                 "illuminate/support": "^12.0 || ^13.0",
-                "php": "^8.4"
+                "php": "^8.4",
+                "symfony/http-foundation": "^7.0 || ^8.0"
             },
             "require-dev": {
                 "larastan/larastan": "^3.0",
@@ -6022,9 +6025,9 @@
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "support": {
                 "issues": "https://github.com/cboxdk/laravel-sync/issues",
-                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.2.0"
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.3.0"
             },
-            "time": "2026-09-18T19:30:53+00:00"
+            "time": "2026-09-20T07:09:00+00:00"
         },
         {
             "name": "composer/pcre",
