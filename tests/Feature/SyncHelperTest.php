@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Cbox\Sync\Client\Laravel\Contracts\SyncTransport;
+use Cbox\Sync\Client\Laravel\Exceptions\SyncRequestFailed;
 use Cbox\Sync\Client\Laravel\Tests\Fixtures\KernelTransport;
 use Cbox\Sync\Client\Laravel\ValueObjects\SyncResponse;
 use Cbox\Sync\Data\FieldOperation as Op;
@@ -86,4 +87,42 @@ it('is safe to call with an empty queue', function () {
 
     expect($outcome->sent)->toBe(0);
     expect($outcome->retryLater)->toBeFalse();
+});
+
+/**
+ * push() has always treated a non-answer - an HTML error page, a proxy timeout,
+ * a dead socket - as "leave it and come back". Reading did not: any non-2xx
+ * threw, so a dropped network during a pull became an uncaught exception out of
+ * the caller's scheduler. The same defect the transport itself had, one layer up.
+ */
+it('does not raise a dead network while reading', function () {
+    $this->bindTransport(fn (): SyncTransport => new class implements SyncTransport
+    {
+        public function post(string $endpoint, array $body): SyncResponse
+        {
+            return new SyncResponse(0, new stdClass);
+        }
+    });
+
+    $client = $this->syncClient();
+    $client->outbox()->queue(new EntityKey('team-1', 'tasks', 'h1'), MutationKind::Create, [Op::set('title', 'a')], 0);
+
+    $outcome = $client->sync('tasks', 'team-1');
+
+    expect($outcome->retryLater)->toBeTrue();
+    expect($client->outbox()->pending())->toBe(1);
+});
+
+/** A considered refusal is still raised: that one tells the caller something. */
+it('still raises a refusal while reading', function () {
+    $this->bindTransport(fn (): SyncTransport => new class implements SyncTransport
+    {
+        public function post(string $endpoint, array $body): SyncResponse
+        {
+            return new SyncResponse(403, (object) ['error' => 'forbidden', 'retriable' => false]);
+        }
+    });
+
+    expect(fn () => $this->syncClient()->pull('tasks', 'team-1'))
+        ->toThrow(SyncRequestFailed::class);
 });

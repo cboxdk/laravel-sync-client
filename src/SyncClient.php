@@ -297,7 +297,9 @@ class SyncClient
             $token = $this->pendingToken($type, $scope);
             do {
                 $response = $this->transport->post('bootstrap', $request + ['page_size' => $pageSize] + ($token === null ? [] : ['token' => $token]));
-                $this->guard($response);
+                if (! $this->guard($response)) {
+                    return;
+                }
                 $page = Wire::bootstrapPage($response->body, new BootstrapToken(Support\Read::string($response->body, 'token')));
                 $this->replica->applyBootstrap($page);
                 $this->views->remember($type, $scope, $page->context->fingerprint());
@@ -308,7 +310,9 @@ class SyncClient
 
         while ($cursor instanceof ViewCursor) {
             $response = $this->transport->post('delta', $request + ['cursor' => ['position' => $cursor->position->value, 'context' => $cursor->context->fingerprint()]]);
-            $this->guard($response);
+            if (! $this->guard($response)) {
+                return;
+            }
             $delta = Wire::deltaPage($response->body);
             $this->replica->applyDelta($delta);
             $cursor = $delta->hasMore ? $delta->cursor : null;
@@ -345,14 +349,32 @@ class SyncClient
         return $context === null ? null : $this->replica->cursor($context);
     }
 
-    private function guard(SyncResponse $response): void
+    /**
+     * A refusal is raised; a non-answer is not.
+     *
+     * An HTML error page, a proxy timeout, a dead socket - none of those is the
+     * server saying anything, and push() has always treated them as "leave it
+     * and come back". Reading did not: any non-2xx threw, so a dropped network
+     * during a pull became an uncaught exception out of the caller's scheduler,
+     * which is the same defect the transport itself had.
+     *
+     * Only a considered refusal - one that names an error - is worth raising,
+     * because only that tells the caller something it can act on.
+     */
+    private function guard(SyncResponse $response): bool
     {
-        if (! $response->ok()) {
-            throw new Exceptions\SyncRequestFailed(
-                $response->error() ?? 'unknown',
-                $response->status,
-                $response->reason(),
-            );
+        if ($response->ok()) {
+            return true;
         }
+
+        if ($response->error() === null) {
+            return false;
+        }
+
+        throw new Exceptions\SyncRequestFailed(
+            $response->error(),
+            $response->status,
+            $response->reason(),
+        );
     }
 }
