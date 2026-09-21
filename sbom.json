@@ -1,7 +1,7 @@
 {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:4520181f-b553-50e7-9230-5e342cc4642d",
+    "serialNumber": "urn:uuid:91e8a5ab-f0ad-526c-96cc-5d0f0085e914",
     "version": 1,
     "metadata": {
         "component": {
@@ -90,12 +90,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.4.0",
+            "bom-ref": "pkg:composer/cboxdk/laravel-sync@v0.5.0",
             "group": "cboxdk",
             "name": "laravel-sync",
-            "version": "v0.4.0",
+            "version": "v0.5.0",
             "scope": "optional",
-            "purl": "pkg:composer/cboxdk/laravel-sync@v0.4.0",
+            "purl": "pkg:composer/cboxdk/laravel-sync@v0.5.0",
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "licenses": [
                 {
@@ -105,7 +105,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/6a9186f66e1e74f13f79e3a7e77e3952dfd14421"
+                    "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/215ff15a7cc5140f33b62a9ad1fd0cf844d25ca7"
                 },
                 {
                     "type": "vcs",
@@ -115,12 +115,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/cboxdk/sync@v0.6.0",
+            "bom-ref": "pkg:composer/cboxdk/sync@v0.7.0",
             "group": "cboxdk",
             "name": "sync",
-            "version": "v0.6.0",
+            "version": "v0.7.0",
             "scope": "required",
-            "purl": "pkg:composer/cboxdk/sync@v0.6.0",
+            "purl": "pkg:composer/cboxdk/sync@v0.7.0",
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "licenses": [
                 {
@@ -130,7 +130,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/cboxdk/sync/zipball/e67cb4f33067e1e6fd31c8fca6029be497f714fd"
+                    "url": "https://api.github.com/repos/cboxdk/sync/zipball/d9f5f59bec26c497d3244b34f3f2461c414d469e"
                 },
                 {
                     "type": "vcs",
@@ -290,12 +290,12 @@
         },
         {
             "type": "library",
-            "bom-ref": "pkg:composer/doctrine/lexer@3.0.1",
+            "bom-ref": "pkg:composer/doctrine/lexer@3.0.2",
             "group": "doctrine",
             "name": "lexer",
-            "version": "3.0.1",
+            "version": "3.0.2",
             "scope": "required",
-            "purl": "pkg:composer/doctrine/lexer@3.0.1",
+            "purl": "pkg:composer/doctrine/lexer@3.0.2",
             "description": "PHP Doctrine Lexer parser library that can be used in Top-Down, Recursive Descent Parsers.",
             "licenses": [
                 {
@@ -305,7 +305,7 @@
             "externalReferences": [
                 {
                     "type": "distribution",
-                    "url": "https://api.github.com/repos/doctrine/lexer/zipball/31ad66abc0fc9e1a1f2d9bc6a42668d2fbbcd6dd"
+                    "url": "https://api.github.com/repos/doctrine/lexer/zipball/e96fe45e92a54233726014a7cc7340abf29bb14c"
                 },
                 {
                     "type": "vcs",

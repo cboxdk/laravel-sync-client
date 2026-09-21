@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - 2026-09-21
+
+### Fixed
+
+- **A dropped network escaped as an uncaught exception.** `HttpTransport` was the only shipped transport that could throw, and nothing in the client caught it, so DNS failing, a refused connection or a timeout became an uncaught `ConnectionException` out of the host's scheduler. The docblock on `push()` says a proxy timeout leaves the queue exactly as it is; that was true of every test double and of no real deployment. It is now answered the way the client already understands a non-protocol response: queue untouched, nothing sent, nothing abandoned, come back later.
+
+  Every double in the suite returns a value, which is exactly why the suite never saw it. The test points the real transport at a closed port rather than faking the failure.
+
+### Changed
+
+- Allows `cboxdk/sync` `^0.7` and tests against `cboxdk/laravel-sync` `^0.5`.
+
 ## 0.2.0 - 2026-09-20
 
 ### Added (breaking)

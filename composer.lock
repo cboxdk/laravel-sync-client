@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7348f315530b1f3dc5817e07de641d8d",
+    "content-hash": "50886d68dd8c166cc0edc2e6f6442f98",
     "packages": [
         {
             "name": "brick/math",
@@ -141,16 +141,16 @@
         },
         {
             "name": "cboxdk/sync",
-            "version": "v0.6.0",
+            "version": "v0.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/sync.git",
-                "reference": "e67cb4f33067e1e6fd31c8fca6029be497f714fd"
+                "reference": "d9f5f59bec26c497d3244b34f3f2461c414d469e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/sync/zipball/e67cb4f33067e1e6fd31c8fca6029be497f714fd",
-                "reference": "e67cb4f33067e1e6fd31c8fca6029be497f714fd",
+                "url": "https://api.github.com/repos/cboxdk/sync/zipball/d9f5f59bec26c497d3244b34f3f2461c414d469e",
+                "reference": "d9f5f59bec26c497d3244b34f3f2461c414d469e",
                 "shasum": ""
             },
             "require": {
@@ -175,9 +175,9 @@
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "support": {
                 "issues": "https://github.com/cboxdk/sync/issues",
-                "source": "https://github.com/cboxdk/sync/tree/v0.6.0"
+                "source": "https://github.com/cboxdk/sync/tree/v0.7.0"
             },
-            "time": "2026-09-20T19:57:46+00:00"
+            "time": "2026-09-21T08:57:08+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -346,27 +346,25 @@
         },
         {
             "name": "doctrine/lexer",
-            "version": "3.0.1",
+            "version": "3.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/lexer.git",
-                "reference": "31ad66abc0fc9e1a1f2d9bc6a42668d2fbbcd6dd"
+                "reference": "e96fe45e92a54233726014a7cc7340abf29bb14c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/lexer/zipball/31ad66abc0fc9e1a1f2d9bc6a42668d2fbbcd6dd",
-                "reference": "31ad66abc0fc9e1a1f2d9bc6a42668d2fbbcd6dd",
+                "url": "https://api.github.com/repos/doctrine/lexer/zipball/e96fe45e92a54233726014a7cc7340abf29bb14c",
+                "reference": "e96fe45e92a54233726014a7cc7340abf29bb14c",
                 "shasum": ""
             },
             "require": {
                 "php": "^8.1"
             },
             "require-dev": {
-                "doctrine/coding-standard": "^12",
-                "phpstan/phpstan": "^1.10",
-                "phpunit/phpunit": "^10.5",
-                "psalm/plugin-phpunit": "^0.18.3",
-                "vimeo/psalm": "^5.21"
+                "doctrine/coding-standard": "^14",
+                "phpstan/phpstan": "^2",
+                "phpunit/phpunit": "^10.5.58 || ^12.5.4"
             },
             "type": "library",
             "autoload": {
@@ -403,7 +401,7 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/lexer/issues",
-                "source": "https://github.com/doctrine/lexer/tree/3.0.1"
+                "source": "https://github.com/doctrine/lexer/tree/3.0.2"
             },
             "funding": [
                 {
@@ -419,7 +417,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-02-05T11:56:58+00:00"
+            "time": "2026-06-14T20:44:06+00:00"
         },
         {
             "name": "dragonmantank/cron-expression",
@@ -5975,20 +5973,20 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "v0.4.0",
+            "version": "v0.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/laravel-sync.git",
-                "reference": "6a9186f66e1e74f13f79e3a7e77e3952dfd14421"
+                "reference": "215ff15a7cc5140f33b62a9ad1fd0cf844d25ca7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/6a9186f66e1e74f13f79e3a7e77e3952dfd14421",
-                "reference": "6a9186f66e1e74f13f79e3a7e77e3952dfd14421",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/215ff15a7cc5140f33b62a9ad1fd0cf844d25ca7",
+                "reference": "215ff15a7cc5140f33b62a9ad1fd0cf844d25ca7",
                 "shasum": ""
             },
             "require": {
-                "cboxdk/sync": "^0.5 || ^0.6",
+                "cboxdk/sync": "^0.7",
                 "ext-pdo": "*",
                 "illuminate/config": "^12.0 || ^13.0",
                 "illuminate/contracts": "^12.0 || ^13.0",
@@ -6025,9 +6023,9 @@
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "support": {
                 "issues": "https://github.com/cboxdk/laravel-sync/issues",
-                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.4.0"
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.5.0"
             },
-            "time": "2026-09-20T19:59:08+00:00"
+            "time": "2026-09-21T08:58:59+00:00"
         },
         {
             "name": "composer/pcre",
