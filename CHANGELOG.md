@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 - 2026-09-21
+
+### Added
+
+- **`sync()`** — send what this device owes, then take what it is owed, in one call. push() and pull() were the whole surface, so every host wrote the same loop, and the order matters in a way that is not obvious: a device that pulls before pushing reads a server that has not seen its own writes yet, so its edits come back a round trip later and whatever it showed in between is behind its own user.
+
+- **`space()`** — which space a view lives in, once this device has synced. A change notification names a space, because that is the boundary the log is kept in, but a client works in types and scopes and cannot map one to the other: the mapping is the server's own authorization policy. The context saved during bootstrap carries it, so a device knows which channel to listen on.
+
+### Changed
+
+- The quickstart now ends with a device that has written offline, synced, and handled the two things that actually need handling: the rename the server performed, and the writes that were processed but did not land as asked. Those two loops are the difference between a client that works and one that silently loses edits.
+- Allows `cboxdk/sync` `^0.8` and tests against `cboxdk/laravel-sync` `^0.6`.
+
 ## 0.3.0 - 2026-09-21
 
 ### Fixed
