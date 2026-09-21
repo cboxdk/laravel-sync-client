@@ -1,48 +1,100 @@
 ---
 title: "Quickstart"
 weight: 2
-description: "Queue a write offline, then sync it."
+description: "Zero to a synced record, offline and back."
 ---
 
 # Quickstart
 
-```sh
+```bash
 composer require cboxdk/laravel-sync-client
-php artisan vendor:publish --tag=sync-client-config
 ```
-
-Set the server, this device's replica id, and where its local database lives:
 
 ```dotenv
-SYNC_CLIENT_URL=https://app.example.com/sync
-SYNC_CLIENT_REPLICA=device-7f3a
-SYNC_CLIENT_DATABASE=/var/lib/myapp/replica.sqlite
+SYNC_CLIENT_URL=https://your-app.example.com/sync
+SYNC_CLIENT_REPLICA=this-device
 ```
 
-The replica id must be **stable for the life of that local database**. Changing
-it strands every write still queued under the old one.
+`SYNC_CLIENT_REPLICA` identifies this device and must be stable across restarts.
+It is what the server acknowledges against; a device that changes it starts a
+new stream and re-sends everything it has not had acknowledged.
+
+## Write, offline
 
 ```php
-$client = app(SyncClient::class);
+$outbox = app(Outbox::class);
 
-$client->outbox()->queue(
-    new EntityKey($teamId, 'tasks', $taskId),
-    MutationKind::Update,
-    [FieldOperation::set('title', $title)],
-    $baseVersion,
+$outbox->queue(
+    new EntityKey('team-1', 'tasks', 'my-handle'),
+    MutationKind::Create,
+    [FieldOperation::set('title', 'Ship it'), FieldOperation::set('status', 'open')],
+    baseVersion: 0,
 );
-
-$outcome = $client->push('tasks', $teamId);
-if ($outcome->retryLater) {
-    // The server asked us to come back. The queue is untouched and in order.
-}
-foreach ($client->outbox()->abandoned() as $dead) {
-    // Nothing else will tell the user this write is never going to land.
-}
-
-$client->pull('tasks', $teamId);
 ```
 
-`push()` and `pull()` are ordinary synchronous calls. Put them behind a queued
-job, a scheduler entry, or a "sync now" button — the package has no opinion, and
-deliberately does not install a scheduler of its own.
+Nothing leaves the device. The queue is durable, so this survives being killed.
+
+`'my-handle'` is not the record's id — the server names a new record, and the
+id you sent is only what you call it in the meantime.
+
+## Sync
+
+```php
+$outcome = app(SyncClient::class)->sync('tasks', 'team-1');
+```
+
+One call: send what this device owes, then take what it is owed. It pushes
+first on purpose — a device that reads before writing sees a server that has
+not seen its own edits yet.
+
+## Handle the two things that need handling
+
+```php
+// 1. The server named what you created. Anything you stored under the handle
+//    is now under a different id.
+foreach ($outcome->named as $rename) {
+    $this->relabel($rename->handle->id, $rename->named->id);
+}
+
+// 2. Writes that were processed but did NOT land as asked. Nothing else in the
+//    system will mention these, and "sent" is not "saved".
+foreach ($outcome->needingAttention() as $problem) {
+    $this->tell($problem);
+}
+```
+
+If you write no other code from this page, write those two loops.
+
+## Read
+
+```php
+$record = app(SyncClient::class)->replica()->record($entity);
+
+$record?->value('title')->value();
+```
+
+## Stay current without polling hard
+
+Subscribe to the server's change notification, and call `sync()` when it fires.
+The client can tell you which channel to listen on once it has synced at least
+once:
+
+```php
+$space = app(SyncClient::class)->space('tasks', 'team-1');
+```
+
+Keep a slow poll as well — every few minutes is enough. Notification delivery is
+at-most-once, so a missed signal must never mean missed data. The signal makes
+sync prompt; the cursor is what makes it correct.
+
+## What happens when things go wrong
+
+You do not have to handle any of this. It is handled:
+
+- **The network drops.** The queue is untouched and `retryLater` is true.
+- **A response is lost.** Re-sending carries the same mutation id, so the server
+  answers from its receipt rather than applying twice.
+- **The server says reset.** The view is rebuilt from a fresh bootstrap
+  automatically, once. A second reset in a row is raised to you.
+- **Two people edit the same field.** Both proposals survive; the outcome tells
+  you so rather than picking silently.

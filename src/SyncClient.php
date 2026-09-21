@@ -47,6 +47,48 @@ class SyncClient
      * Send queued mutations, oldest first, until the queue empties or the
      * server tells us to stop.
      */
+    /**
+     * Send what this device owes, then take what it is owed.
+     *
+     * The one call a notification handler makes. Push first: a device that
+     * pulls before pushing reads a server that has not seen its own writes
+     * yet, so its edits come back a round trip later and anything it shows in
+     * the meantime is behind its own user.
+     *
+     * Nothing here depends on having been notified. Calling it on a timer is
+     * the same operation, which is what lets a missed signal cost promptness
+     * rather than correctness.
+     */
+    public function sync(string $type, ?string $scope = null, int $pageSize = 100): PushOutcome
+    {
+        $outcome = $this->push($type, $scope);
+        $this->pull($type, $scope, $pageSize);
+
+        return $outcome;
+    }
+
+    /**
+     * The space this view lives in, once this device has seen it.
+     *
+     * A change notification names a space, because that is the boundary the log
+     * is kept in - but a client works in types and scopes and cannot map one to
+     * the other: the mapping is the server's own authorization policy. The
+     * context saved during bootstrap carries it, so after the first sync a
+     * device knows which channel to listen on.
+     *
+     * Null before that first sync. Subscribe after it, or subscribe to the
+     * scopes your application already knows and let this confirm them.
+     */
+    public function space(string $type, ?string $scope = null): ?string
+    {
+        $fingerprint = $this->views->fingerprint($type, $scope);
+        if ($fingerprint === null) {
+            return null;
+        }
+
+        return $this->replica->contextFor($fingerprint)?->space;
+    }
+
     public function push(string $type, ?string $scope = null): PushOutcome
     {
         $sent = 0;
