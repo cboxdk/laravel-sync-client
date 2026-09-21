@@ -169,8 +169,10 @@ class TestCase extends BaseTestCase
     protected function tearDown(): void
     {
         parent::tearDown();
-        if ($this->replicaDatabase !== '') {
-            @unlink($this->replicaDatabase);
+        // A test that never resolved the client leaves no file behind, and
+        // unlinking a missing one is a warning PHPUnit will not suppress.
+        if ($this->replicaDatabase !== '' && is_file($this->replicaDatabase)) {
+            unlink($this->replicaDatabase);
         }
     }
 }

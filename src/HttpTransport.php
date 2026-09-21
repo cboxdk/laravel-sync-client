@@ -6,6 +6,7 @@ namespace Cbox\Sync\Client\Laravel;
 
 use Cbox\Sync\Client\Laravel\Contracts\SyncTransport;
 use Cbox\Sync\Client\Laravel\ValueObjects\SyncResponse;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory;
 
 class HttpTransport implements SyncTransport
@@ -19,6 +20,23 @@ class HttpTransport implements SyncTransport
     ) {}
 
     public function post(string $endpoint, array $body): SyncResponse
+    {
+        try {
+            return $this->send($endpoint, $body);
+        } catch (ConnectionException) {
+            // The request never got an answer: DNS, a refused connection, a
+            // timeout. SyncClient already knows what to do with a response that
+            // is not a protocol answer - leave the queue exactly as it is and
+            // come back - and that is the correct handling here too. Letting it
+            // escape instead made the one shipped transport the only one that
+            // could throw, and nothing in the client caught it, so a dropped
+            // network became an uncaught exception in the host's scheduler.
+            return new SyncResponse(0, new \stdClass);
+        }
+    }
+
+    /** @param array<string, mixed> $body */
+    private function send(string $endpoint, array $body): SyncResponse
     {
         $response = $this->http
             ->withHeaders($this->headers + ['Accept' => 'application/json'])
