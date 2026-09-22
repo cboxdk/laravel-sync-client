@@ -360,7 +360,10 @@ class SyncClient
 
             if ($status === 'retry') {
                 // Retrying is safe only under the same identity, so the queue
-                // stays untouched and in order.
+                // stays untouched and in order. This sending was answered, so
+                // it did not land.
+                $this->outbox->answered($mutation);
+
                 return $wait($mutation, $response);
             }
 
@@ -368,6 +371,8 @@ class SyncClient
                 // About the session, not the write. Abandoning here turned one
                 // expired token into every queued write lost; the queue waits
                 // for the user to sign in again instead.
+                $this->outbox->answered($mutation);
+
                 return $wait($mutation, $response, true);
             }
 
@@ -442,11 +447,12 @@ class SyncClient
     /**
      * The application has told the user about an abandoned write; stop
      * reporting it. A dismissed create takes the writes that need its record
-     * along with it, as parent_abandoned.
+     * along with it - parent_abandoned, or parent_unknown when the create may
+     * have landed - and returns how many, which are now abandoned in turn.
      */
-    public function dismiss(string $mutationId): void
+    public function dismiss(string $mutationId): int
     {
-        $this->outbox->dismiss($mutationId, $this->references, $this->scopedBy);
+        return $this->outbox->dismiss($mutationId, $this->references, $this->scopedBy);
     }
 
     /**
