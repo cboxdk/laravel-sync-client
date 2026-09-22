@@ -67,7 +67,7 @@ Nothing leaves the device. The queue is durable, so this survives being killed.
 id you sent is only what you call it in the meantime. Handles must be unique on the
 device - a UUID is simplest: a reference to a handle is matched by type and
 handle alone, since a child may point into another scope, so queueing a create
-whose handle is already used for a record in another scope is refused.
+whose handle is already used for a record in another scope is refused. Nor may a handle equal a server id: a reference to that server record would be rewritten to the handle's name.
 
 ## Sync
 
