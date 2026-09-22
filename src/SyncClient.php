@@ -111,20 +111,6 @@ class SyncClient
     }
 
     /**
-     * Send queued mutations, oldest first, until the queue empties or the
-     * server tells us to stop.
-     *
-     * Send what this device owes, then take what it is owed.
-     *
-     * The one call a notification handler makes. Push first: a device that
-     * pulls before pushing reads a server that has not seen its own writes
-     * yet, so its edits come back a round trip later and anything it shows in
-     * the meantime is behind its own user.
-     *
-     * Nothing here depends on having been notified. Calling it on a timer is
-     * the same operation, which is what lets a missed signal cost promptness
-     * rather than correctness.
-     *
      * The key to queue a write under: this type, in this scope.
      *
      * The id is the record's name once the server has given it one, or a
@@ -157,6 +143,18 @@ class SyncClient
         return new EntityRecord($this->key($type, $scope, $id), $record->version, $record->fields, $record->deleted, $record->deletion);
     }
 
+    /**
+     * Send what this device owes, then take what it is owed.
+     *
+     * The one call a notification handler makes. Push first: a device that
+     * pulls before pushing reads a server that has not seen its own writes
+     * yet, so its edits come back a round trip later and anything it shows in
+     * the meantime is behind its own user.
+     *
+     * Nothing here depends on having been notified. Calling it on a timer is
+     * the same operation, which is what lets a missed signal cost promptness
+     * rather than correctness.
+     */
     public function sync(string $type, ?string $scope = null, ?int $pageSize = null): PushOutcome
     {
         $outcome = $this->push($type, $scope);
@@ -195,6 +193,9 @@ class SyncClient
     }
 
     /**
+     * Send queued mutations, oldest first, until the queue empties or the
+     * server tells us to stop.
+     *
      * Only one push at a time per device.
      *
      * A queue worker and a scheduler draining together would send the same
@@ -359,10 +360,7 @@ class SyncClient
 
             if ($status === 'retry') {
                 // Retrying is safe only under the same identity, so the queue
-                // stays untouched and in order. This sending was answered, so
-                // it did not land.
-                $this->outbox->answered($mutation);
-
+                // stays untouched and in order.
                 return $wait($mutation, $response);
             }
 
@@ -370,8 +368,6 @@ class SyncClient
                 // About the session, not the write. Abandoning here turned one
                 // expired token into every queued write lost; the queue waits
                 // for the user to sign in again instead.
-                $this->outbox->answered($mutation);
-
                 return $wait($mutation, $response, true);
             }
 
@@ -446,12 +442,11 @@ class SyncClient
     /**
      * The application has told the user about an abandoned write; stop
      * reporting it. A dismissed create takes the writes that need its record
-     * along with it - parent_abandoned, or parent_unknown when the create may
-     * have landed - and returns how many, which are now abandoned in turn.
+     * along with it, as parent_abandoned.
      */
-    public function dismiss(string $mutationId): int
+    public function dismiss(string $mutationId): void
     {
-        return $this->outbox->dismiss($mutationId, $this->references, $this->scopedBy);
+        $this->outbox->dismiss($mutationId, $this->references, $this->scopedBy);
     }
 
     /**
@@ -644,8 +639,9 @@ class SyncClient
      * changed the view again while this device was rebuilding it, and retrying
      * in a loop would spin against a moving target rather than letting the
      * application decide to back off.
+     *
+     * @return bool whether the view is now caught up - false when the server did not answer, or asked to come back later
      */
-    /** @return bool whether the view is now caught up - false when the server did not answer, or asked to come back later */
     public function pull(string $type, ?string $scope = null, ?int $pageSize = null): bool
     {
         $pageSize ??= $this->pageSize;
