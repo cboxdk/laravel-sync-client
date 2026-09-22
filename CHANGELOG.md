@@ -8,6 +8,8 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 
 - The device's SQLite file is brought up to date in place on first use: new outbox columns and a names table. Writes queued before the upgrade count as sent once, so one refused later needs `evenIfItMayHaveLanded` to be requeued. Back the file up first; downgrading is not supported.
 - **Breaking:** `sync()` no longer throws when the pull fails - check `pullFailure` and `pulled`. A write the server refused stays in `outbox()->abandoned()` until you `dismiss()` it.
+- Each type and scope now travels on its own replica stream. Writes queued before the upgrade keep the stream they were queued on.
+- Queue writes under the scope you push with - `$client->key($type, $scope, $id)`. A write queued under another label is no longer sent by that push.
 
 ### Added
 
@@ -36,11 +38,6 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 - **A crash between acknowledging a create and renaming what is queued behind it** stranded those writes. It is one step now.
 - **A crash during a bootstrap could wedge the view.** The view is remembered before its page is applied, and the index row is upserted.
 - **A server-wins noop was reported as saved.** `MutationOutcome::overridden()` names the fields, and `applied()` is false for them.
-
-### Upgrading
-
-- Each type and scope now travels on its own replica stream. Writes queued before the upgrade keep the stream they were queued on.
-- Queue writes under the scope you push with - `$client->key($type, $scope, $id)`. A write queued under another label is no longer sent by that push.
 
 ## 0.4.0 - 2026-09-21
 
