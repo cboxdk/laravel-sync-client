@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c60133f92b09b45daee8d0dd0b7a8ee6",
+    "content-hash": "25ba4a29573a594412e2415931905759",
     "packages": [
         {
             "name": "brick/math",
@@ -141,26 +141,28 @@
         },
         {
             "name": "cboxdk/sync",
-            "version": "v0.8.0",
+            "version": "v0.9.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/sync.git",
-                "reference": "223da2a0fc28f38fee05e1c9dede44cee3d3b0fb"
+                "reference": "bc324679586cf1e26ffdbf0eafed8d4d196674bd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/sync/zipball/223da2a0fc28f38fee05e1c9dede44cee3d3b0fb",
-                "reference": "223da2a0fc28f38fee05e1c9dede44cee3d3b0fb",
+                "url": "https://api.github.com/repos/cboxdk/sync/zipball/bc324679586cf1e26ffdbf0eafed8d4d196674bd",
+                "reference": "bc324679586cf1e26ffdbf0eafed8d4d196674bd",
                 "shasum": ""
             },
             "require": {
                 "ext-pdo": "*",
+                "ext-zlib": "*",
                 "php": "^8.4"
             },
             "require-dev": {
                 "laravel/pint": "^1.32",
                 "pestphp/pest": "^5.2",
-                "phpstan/phpstan": "^2.2"
+                "phpstan/phpstan": "^2.2",
+                "phpstan/phpstan-strict-rules": "^2.0"
             },
             "type": "library",
             "autoload": {
@@ -175,9 +177,9 @@
             "description": "Framework-independent sync engine with explicit field conflicts for offline-first applications",
             "support": {
                 "issues": "https://github.com/cboxdk/sync/issues",
-                "source": "https://github.com/cboxdk/sync/tree/v0.8.0"
+                "source": "https://github.com/cboxdk/sync/tree/v0.9.0"
             },
-            "time": "2026-09-21T10:43:22+00:00"
+            "time": "2026-09-22T16:48:16+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -5973,20 +5975,20 @@
         },
         {
             "name": "cboxdk/laravel-sync",
-            "version": "v0.6.0",
+            "version": "v0.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cboxdk/laravel-sync.git",
-                "reference": "6a699c4253e38b4315ab541bb7d2e2ba9492c57b"
+                "reference": "1679524c0387dfbed40800f592faf0d3cb12c75f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/6a699c4253e38b4315ab541bb7d2e2ba9492c57b",
-                "reference": "6a699c4253e38b4315ab541bb7d2e2ba9492c57b",
+                "url": "https://api.github.com/repos/cboxdk/laravel-sync/zipball/1679524c0387dfbed40800f592faf0d3cb12c75f",
+                "reference": "1679524c0387dfbed40800f592faf0d3cb12c75f",
                 "shasum": ""
             },
             "require": {
-                "cboxdk/sync": "^0.8",
+                "cboxdk/sync": "^0.9",
                 "ext-pdo": "*",
                 "illuminate/config": "^12.0 || ^13.0",
                 "illuminate/contracts": "^12.0 || ^13.0",
@@ -6003,7 +6005,8 @@
                 "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.32",
                 "orchestra/testbench": "^10.0 || ^11.0",
-                "pestphp/pest": "^3.5 || ^4.0"
+                "pestphp/pest": "^3.5 || ^4.0",
+                "phpstan/phpstan-strict-rules": "^2.0"
             },
             "suggest": {
                 "cboxdk/laravel-ssrf": "Required for webhook delivery: a callback URL is tenant-supplied input aimed at your own network.",
@@ -6029,9 +6032,9 @@
             "description": "Offline-first sync engine for Laravel: durable storage, field-level conflicts and contextual client views",
             "support": {
                 "issues": "https://github.com/cboxdk/laravel-sync/issues",
-                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.6.0"
+                "source": "https://github.com/cboxdk/laravel-sync/tree/v0.7.0"
             },
-            "time": "2026-09-21T10:44:29+00:00"
+            "time": "2026-09-22T16:59:32+00:00"
         },
         {
             "name": "composer/pcre",
@@ -8459,6 +8462,58 @@
                 }
             ],
             "time": "2026-09-12T21:39:33+00:00"
+        },
+        {
+            "name": "phpstan/phpstan-strict-rules",
+            "version": "2.0.12",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpstan/phpstan-strict-rules.git",
+                "reference": "2bc5ae19ae965663b62ac907ee6342c3903ec93b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/phpstan-strict-rules/zipball/2bc5ae19ae965663b62ac907ee6342c3903ec93b",
+                "reference": "2bc5ae19ae965663b62ac907ee6342c3903ec93b",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.4 || ^8.0",
+                "phpstan/phpstan": "^2.1.52"
+            },
+            "require-dev": {
+                "php-parallel-lint/php-parallel-lint": "^1.2",
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpunit/phpunit": "^9.6",
+                "shipmonk/name-collision-detector": "^2.1"
+            },
+            "type": "phpstan-extension",
+            "extra": {
+                "phpstan": {
+                    "includes": [
+                        "rules.neon"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "PHPStan\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Extra strict and opinionated rules for PHPStan",
+            "keywords": [
+                "static analysis"
+            ],
+            "support": {
+                "issues": "https://github.com/phpstan/phpstan-strict-rules/issues",
+                "source": "https://github.com/phpstan/phpstan-strict-rules/tree/2.0.12"
+            },
+            "time": "2026-07-19T07:24:06+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
