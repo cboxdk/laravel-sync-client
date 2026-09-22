@@ -353,3 +353,18 @@ it('sends a record\'s create before an edit queued ahead of it', function () {
         ->and($outcome->outcomes[1]->reason)->not->toBe('entity_not_found')
         ->and($client->outbox()->abandoned())->toBe([]);
 });
+
+/** A redirect carried the device's credentials to whatever host it named. */
+it('does not follow a redirect with the device\'s credentials', function () {
+    Http::fake([
+        'sync.test/*' => Http::response('', 302, ['Location' => 'https://elsewhere.test/steal']),
+        'elsewhere.test/*' => Http::response(['status' => 'applied'], 200),
+    ]);
+    config()->set('sync-client.url', 'https://sync.test');
+    config()->set('sync-client.headers', ['Authorization' => 'Bearer secret']);
+
+    $response = app(SyncTransport::class)->post('push', []);
+
+    expect($response->status)->toBe(302);
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'elsewhere.test'));
+});

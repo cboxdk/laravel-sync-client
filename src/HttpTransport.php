@@ -42,6 +42,9 @@ class HttpTransport implements SyncTransport
         $response = $this->http
             ->withHeaders(($this->headers instanceof SyncHeaders ? $this->headers->headers() : $this->headers) + ['Accept' => 'application/json'])
             ->timeout($this->timeoutSeconds)
+            // Never followed: a redirect would carry this device's credentials
+            // to whatever host it names.
+            ->withoutRedirecting()
             // No automatic retry here. A retry is only safe when it reuses the
             // same mutation id, and whether that is the right move depends on
             // the answer - which is SyncClient's decision, not the socket's.
