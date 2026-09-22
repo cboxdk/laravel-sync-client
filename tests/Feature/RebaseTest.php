@@ -182,13 +182,19 @@ it('never takes back a field the server kept', function () {
         ->and(app(Store::class)->record($key)?->value('title')->value())->toBe('alice-title');
 });
 
-/** Queueing an edit on what record() returns is the natural next step; it has to reach the server. */
+/**
+ * Queueing an edit on what record() returns is the natural next step; it has to
+ * reach the server. On nodes the scope (p1) and the server's space (team-1)
+ * differ, which is the case the re-keying exists for.
+ */
 it('hands back a record that can be edited and pushed under its scope', function () {
-    [$alice, , $key] = sharedTask($this);
-    $record = $alice->record('tasks', 'team-1', $key->id) ?? throw new LogicException('expected the record');
+    $client = $this->syncClientAs('alice');
+    $client->outbox()->queue($client->key('nodes', 'p1', 'n'), MutationKind::Create, [Op::set('name', 'n'), Op::set('parent_id', 'p1')], 0);
+    $id = $client->sync('nodes', 'p1')->named[0]->named->id;
 
-    $alice->outbox()->queue($record->entity, MutationKind::Update, [Op::set('title', 'edited')], $record->version->value);
+    $record = $client->record('nodes', 'p1', $id) ?? throw new LogicException('expected the record');
+    $client->outbox()->queue($record->entity, MutationKind::Update, [Op::set('name', 'edited')], $record->version->value);
 
-    expect($alice->sync('tasks', 'team-1')->sent)->toBe(1)
-        ->and(app(Store::class)->record($key)?->value('title')->value())->toBe('edited');
+    expect($client->sync('nodes', 'p1')->sent)->toBe(1)
+        ->and(app(Store::class)->record(new EntityKey('team-1', 'nodes', $id))?->value('name')->value())->toBe('edited');
 });
