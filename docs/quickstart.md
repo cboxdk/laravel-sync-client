@@ -52,9 +52,10 @@ return [
 ```
 
 Exactly the parent's create goes first. If the server refused the parent, the
-child is abandoned with it (`parent_abandoned`) rather than sent pointing at a
-record that will never exist; `$client->requeue($id)` brings either back under
-every name the server has given since.
+child is abandoned with it (`parent_abandoned`, or `parent_unknown` when the parent
+may have landed) rather than sent pointing at a record that may not exist.
+`$client->requeue($id)` brings the parent back, and the child once its parent is
+queued again or named, under every name the server has given since.
 
 Nothing leaves the device. The queue is durable, so this survives being killed.
 

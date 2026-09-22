@@ -21,8 +21,9 @@ the whole substance of the package.
 | a refusal of this write - `invalid_request`, `invalid_field_value`, `forbidden`, `field_not_writable`, `unknown_type`, `protocol_violation`, and a 413 from anything | abandons it with the reason | it can never be sent again under this identity, so leaving it would block everything behind it forever |
 | anything else - a 5xx, a 429, an HTML page, no answer | stops, leaves the queue exactly as it is, and says which write it stopped on (`blockedBy`, `httpStatus`, `error`, `retryAfter`) | not the server refusing the write. A queue held up by one write can be told apart from a device that is offline |
 
-A child whose parent create was abandoned or refused is abandoned with it as
-`parent_abandoned`, rather than sent pointing at a record that will never exist.
+A child whose parent create was abandoned or refused is abandoned with it rather
+than sent pointing at a record that may not exist: as `parent_abandoned` when the
+parent certainly did not land, as `parent_unknown` when it may have.
 
 A gap answered twice with the same acknowledged point stops the loop rather than
 spinning: if resending has not helped once, it will not help, and looping
@@ -57,9 +58,14 @@ moment, say a permission the user has since been given - or
 `$client->dismiss($mutationId)` once the user has been told. A requeued write goes
 to the back of the queue under a new identity, because the server may hold a
 receipt for the old one. Dismissing a create abandons the writes that need its
-record - `parent_abandoned`, or `parent_unknown` when the create may have landed
-and its name must be found - `$client->outbox()->found($handle, $name)` - before they are requeued - for you to report in turn.
-`dismiss()` returns how many it took along.
+record, for you to report in turn - `parent_abandoned`, or `parent_unknown` when
+the create may have landed - and `dismiss()` returns how many it took along.
+
+A write that needs a record whose create was abandoned or dismissed cannot be
+requeued until that record exists by a name this device knows: requeue its
+create first, queue a new create for it, or - when it turned out to be on the
+server after all - record its name with `$client->outbox()->found($handle, $name)`.
+`requeue()` says which record it is waiting for.
 
 A `receipt_pruned` or `protocol_violation` write may already be on the server, and so may any write one of whose sendings got no answer at all - the answer that refused it may have come on a resend of a write that had landed. A sending answered "sign in again" did not land, and a gap, a `pull_required` or a processed refusal proves none did. A "busy" answer is not counted either way: a gateway's timeout can look the same, and may follow a write that went through.
 `requeue()` refuses it unless you pass `evenIfItMayHaveLanded: true` after
