@@ -15,6 +15,7 @@ use Cbox\Sync\Data\EntityRecord;
 use Cbox\Sync\Data\FieldOperation;
 use Cbox\Sync\Data\Mutation;
 use Cbox\Sync\Enums\ConflictDecision;
+use Cbox\Sync\Enums\MutationKind;
 use Cbox\Sync\Enums\MutationStatus;
 use Cbox\Sync\ValueObjects\EntityKey;
 use Cbox\Sync\ValueObjects\FieldValue;
@@ -220,6 +221,11 @@ class SyncClient
         // scope the mutation was queued under, and draining anything wider
         // would submit another type's or another tenant's writes.
         while (($next = $this->outbox->peek($type, $label)) !== null) {
+            // Queued before its parent was named - by another process, say -
+            // it still carries the handle. Mapped first, then looked at again.
+            if ($this->outbox->mapNames($next, $this->references, $this->scopedBy)) {
+                continue;
+            }
             // A parent created offline goes first - exactly its create, from
             // whatever type or scope it was queued under - so the child's
             // reference (or its scope) is rewritten to the parent's real id
@@ -277,9 +283,10 @@ class SyncClient
                 // This write may already have been applied, and its answer is
                 // gone: final, never resent - but the stream goes on from where
                 // the server says it is.
-                $acknowledged = $response->body->acknowledged_sequence ?? 0;
-                $this->outbox->abandon($mutation, 'receipt_pruned');
-                $this->outbox->resumeAfter($mutation, is_int($acknowledged) ? $acknowledged : 0);
+                // Its own position counts as acknowledged: jumping to the
+                // server's would renumber older replays behind it past the
+                // pruned range, and they would be applied a second time.
+                $this->outbox->settledUnknown($mutation);
                 $abandoned++;
 
                 continue;
@@ -369,6 +376,15 @@ class SyncClient
                     $parents[] = [$target, $value];
                 }
             }
+        }
+
+        // A later write to a record whose own create was refused: the record
+        // will not exist until the create is requeued, and sending the edit
+        // now only loses it to entity_not_found.
+        if ($mutation->kind !== MutationKind::Create
+            && $this->outbox->queuedCreate($mutation->entity->type, $mutation->entity->id) === null
+            && $this->outbox->createAbandoned($mutation->entity->type, $mutation->entity->id)) {
+            return [$mutation, true];
         }
 
         foreach ($parents as [$parentType, $parentId]) {

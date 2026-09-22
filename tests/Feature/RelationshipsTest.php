@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use Cbox\Sync\Client\Laravel\Contracts\SyncTransport;
+use Cbox\Sync\Client\Laravel\Tests\Fixtures\KernelTransport;
 use Cbox\Sync\Client\Laravel\ValueObjects\PushOutcome;
+use Cbox\Sync\Client\Laravel\ValueObjects\SyncResponse;
 use Cbox\Sync\Contracts\Store;
 use Cbox\Sync\Data\FieldOperation as Op;
 use Cbox\Sync\Enums\MutationKind;
@@ -93,4 +96,83 @@ it('abandons a child with its refused parent, and requeues both under the parent
     $names = namesOf($first, $second);
 
     expect(onServer('team-1', 'nodes', $names['K'], 'name'))->toBe($names['P']);
+});
+
+/** A transport that loses the answer to the first push of a given handle. */
+function losingAnswerFor(object $test, string $handle): void
+{
+    $lost = new ArrayObject(['done' => false]);
+    $app = app();
+    $test->bindTransport(fn (): SyncTransport => new class($app, $handle, $lost) implements SyncTransport
+    {
+        public function __construct(private $app, private string $handle, private ArrayObject $lost) {}
+
+        public function post(string $endpoint, array $body): SyncResponse
+        {
+            $answer = (new KernelTransport($this->app, 'alice'))->post($endpoint, $body);
+            if ($endpoint === 'push' && ($body['id'] ?? null) === $this->handle && $this->lost['done'] === false) {
+                $this->lost['done'] = true;
+
+                return new SyncResponse(0, new stdClass);
+            }
+
+            return $answer;
+        }
+    });
+}
+
+/**
+ * A parent sent ahead of its stream took a number afresh on every attempt, so a
+ * lost answer let another write claim it - and the parent, applied on the
+ * server, came back a protocol violation and was abandoned with its child.
+ * A sent write keeps its number and is resent before anything else on its
+ * stream.
+ */
+it('keeps a parent sent out of order whole through a lost answer', function () {
+    config()->set('sync-client.references', ['tasks' => ['meta' => 'nodes']]);
+    losingAnswerFor($this, 'P');
+    $client = $this->syncClient();
+    $client->outbox()->queue($client->key('nodes', 'p1', 'X'), MutationKind::Create, [Op::set('name', 'x'), Op::set('parent_id', 'p1')], 0);
+    $client->outbox()->queue($client->key('nodes', 'p1', 'P'), MutationKind::Create, [Op::set('name', 'p'), Op::set('parent_id', 'p1')], 0);
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'T'), MutationKind::Create, [Op::set('title', 't'), Op::set('status', 'open'), Op::set('meta', 'P')], 0);
+
+    $first = $client->push('tasks', 'team-1');
+    $second = $client->push('nodes', 'p1');
+    $third = $client->push('tasks', 'team-1');
+    $names = namesOf($first, $second, $third);
+
+    expect($client->outbox()->abandoned())->toBe([])
+        ->and($client->outbox()->pending())->toBe(0)
+        ->and(onServer('team-1', 'tasks', $names['T'], 'meta'))->toBe($names['P']);
+});
+
+/** Queued after the parent was named - by another process - a child still carries the handle. */
+it('maps a write queued after its parent was named', function () {
+    config()->set('sync-client.references', ['tasks' => ['meta' => 'nodes']]);
+    $client = $this->syncClientAs('alice');
+    $client->outbox()->queue($client->key('nodes', 'p1', 'P'), MutationKind::Create, [Op::set('name', 'p'), Op::set('parent_id', 'p1')], 0);
+    $names = namesOf($client->push('nodes', 'p1'));
+
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'T'), MutationKind::Create, [Op::set('title', 't'), Op::set('status', 'open'), Op::set('meta', 'P')], 0);
+    $names += namesOf($client->push('tasks', 'team-1'));
+
+    expect(onServer('team-1', 'tasks', $names['T'], 'meta'))->toBe($names['P']);
+});
+
+/** An edit to a record whose create was refused used to be sent, lost to entity_not_found, and gone. */
+it('keeps an edit to a record whose create was refused, to come back with it', function () {
+    $reader = $this->syncClientAs('reader');
+    $reader->outbox()->queue($reader->key('tasks', 'team-1', 'P'), MutationKind::Create, [Op::set('title', 'draft'), Op::set('status', 'open')], 0);
+    $reader->outbox()->queue($reader->key('tasks', 'team-1', 'P'), MutationKind::Update, [Op::set('title', 'edited')], 1);
+
+    $reader->push('tasks', 'team-1');
+    expect(array_column($reader->outbox()->abandoned(), 'reason'))->toBe(['forbidden', 'parent_abandoned']);
+
+    $alice = $this->syncClientAs('alice');
+    foreach ($alice->outbox()->abandoned() as $entry) {
+        $alice->requeue($entry['mutation']->id);
+    }
+    $names = namesOf($alice->push('tasks', 'team-1'));
+
+    expect(onServer('team-1', 'tasks', $names['P'], 'title'))->toBe('edited');
 });

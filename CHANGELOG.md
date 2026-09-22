@@ -9,7 +9,8 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 - **Decide conflicts on the device.** `'rebase' => KeepMine::class` (or `TakeTheirs`, or your own `RebasePolicy` / `Using` closure) turns on pull-before-push: a stale edit is refused, the policy is asked about each contested field, and the same write goes again knowing what it replaces. After three refusals the server keeps both values; a busy record can delay a write, never lose it.
 - `key()` and `record()` queue and read by type and scope, without the application knowing the server's space mapping.
 - `references` (`'tasks' => ['project_id' => 'projects']`) and `scoped_by` (`'items' => 'projects'`): a push sends exactly the unsent parent's create first, from wherever it was queued, and rewrites the child's field or scope to the parent's real id before the child goes. A child whose parent was refused is abandoned with it (`parent_abandoned`), and `$client->requeue()` brings writes back under every name given since.
-- A write whose receipt the server has pruned (`receipt_pruned`) is abandoned as final and the stream continues from where the server is.
+- A write whose receipt the server has pruned (`receipt_pruned`) is abandoned as final at its own position, so older replays behind it keep theirs and are never applied twice.
+- A sent write keeps its number, and a stream resends a waiting write before numbering another, so a parent sent out of queue order cannot collide with another write through a lost answer. Writes queued after their parent was named are mapped through the name; an edit to a record whose create was refused is held with it for `requeue()`.
 - `outbox()->requeue()`, `dismiss()` and `nameOf()`.
 
 ### Fixed
