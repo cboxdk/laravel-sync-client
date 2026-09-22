@@ -93,7 +93,7 @@ $keep = [];
 do {
     $dismissed = 0;
     foreach ($client->outbox()->abandoned() as ['mutation' => $write, 'reason' => $reason]) {
-        if (in_array($reason, ['receipt_pruned', 'protocol_violation', 'parent_unknown'], true)) {
+        if ($reason === 'parent_unknown' || $client->outbox()->mayHaveLanded($write->id)) {
             // May already be on the server, or needs a record that may be:
             // keep it until someone has checked.
             $keep[$write->id] = [$write, $reason];
@@ -115,10 +115,18 @@ foreach ($outcome->needingAttention() as $problem) {
 }
 ```
 
-A kept create that turns out to exist on the server: tell the outbox its name
-with `$client->outbox()->found($handle, $name)`, then `$client->requeue()` the
-writes that waited for it. One that does not exist: requeue it with
-`evenIfItMayHaveLanded: true`, or dismiss it.
+What to do with a kept write, once someone has checked the server:
+
+- **A create that exists there.** Tell the outbox its name -
+  `$client->outbox()->found($client->key($type, $scope, $handle), $name)` - which
+  also drops the kept create, then `$client->requeue()` each `parent_unknown`
+  write that waited for it.
+- **A create that does not.** `$client->requeue($id, evenIfItMayHaveLanded: true)`;
+  its waiting writes can be requeued once it has been sent and named.
+- **Anything else that did not land.** Requeue it the same way, or dismiss it.
+
+A write that needs a record whose create was abandoned or dismissed and never
+named cannot be requeued until that record is - `requeue()` says which.
 
 If you write no other code from this page, write those loops. A refusal from the
 pull does not throw out of `sync()`: `$outcome->pulled` says whether the view

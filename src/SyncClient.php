@@ -252,8 +252,11 @@ class SyncClient
             // exist, and a child pointing at it is abandoned with it rather than
             // sent holding a handle the server never heard of.
             [$choice, $orphaned] = $this->nextToSend($next, []);
-            if ($orphaned) {
-                $this->outbox->abandon($choice, 'parent_abandoned');
+            if ($orphaned !== null) {
+                // parent_unknown when the parent may exist after all - its
+                // name has to be found before this can go - and never counted
+                // as an answer: this write was not sent.
+                $this->outbox->abandon($choice, $orphaned, answered: false);
                 $abandoned++;
 
                 continue;
@@ -395,7 +398,7 @@ class SyncClient
      *
      * @param  list<string>  $seen  identities already on this path, so a cycle
      *                              of references ends instead of looping
-     * @return array{0: Mutation, 1: bool}
+     * @return array{0: Mutation, 1: string|null} the write, and why it cannot be sent if it cannot
      */
     private function nextToSend(Mutation $mutation, array $seen): array
     {
@@ -419,8 +422,8 @@ class SyncClient
         // now only loses it to entity_not_found.
         if ($mutation->kind !== MutationKind::Create
             && $this->outbox->queuedCreate($mutation->entity->type, $mutation->entity->id) === null
-            && $this->outbox->createAbandoned($mutation->entity->type, $mutation->entity->id)) {
-            return [$mutation, true];
+            && ($reason = $this->outbox->orphanReason($mutation->entity->type, $mutation->entity->id)) !== null) {
+            return [$mutation, $reason];
         }
 
         foreach ($parents as [$parentType, $parentId]) {
@@ -428,12 +431,12 @@ class SyncClient
             if ($create !== null && ! in_array($create->id, $seen, true)) {
                 return $this->nextToSend($create, $seen);
             }
-            if ($create === null && $this->outbox->createAbandoned($parentType, $parentId)) {
-                return [$mutation, true];
+            if ($create === null && ($reason = $this->outbox->orphanReason($parentType, $parentId)) !== null) {
+                return [$mutation, $reason];
             }
         }
 
-        return [$mutation, false];
+        return [$mutation, null];
     }
 
     /**

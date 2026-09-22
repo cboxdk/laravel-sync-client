@@ -295,3 +295,41 @@ it('reads a Retry-After date as GMT whatever the app timezone', function () {
         date_default_timezone_set($zone);
     }
 });
+
+it('accepts every HTTP date form and nothing that only looks like one', function (string $header, bool $valid) {
+    Http::fake(['*' => Http::response(['error' => 'retry', 'retriable' => true], 503, ['Retry-After' => $header])]);
+    config()->set('sync-client.url', 'https://sync.test');
+
+    expect(app(SyncTransport::class)->post('push', [])->retryAfter !== null)->toBe($valid);
+})->with(function (): array {
+    $at = time() + 3600;
+    $imf = gmdate('D, d M Y H:i:s', $at).' GMT';
+    $other = gmdate('D', $at + 86400);
+
+    return [
+        'IMF-fixdate' => [$imf, true],
+        'RFC 850' => [gmdate('l, d-M-y H:i:s', $at).' GMT', true],
+        'asctime' => [gmdate('D M ', $at).str_pad(gmdate('j', $at), 2, ' ', STR_PAD_LEFT).gmdate(' H:i:s Y', $at), true],
+        'wrong weekday' => [$other.substr($imf, 3), false],
+        'day 32' => ['Sun, 32 Nov 2094 08:49:37 GMT', false],
+        'not a date' => ['tomorrow', false],
+    ];
+});
+
+/** A child whose parent may have landed was abandoned as parent_abandoned, and the quickstart threw it away. */
+it('abandons the child of a parent that may have landed as parent_unknown', function () {
+    config()->set('sync-client.references', ['nodes' => ['name' => 'tasks']]);
+    scripted($this,
+        new SyncResponse(504, (object) ['error' => 'gateway_timeout']),
+        new SyncResponse(403, (object) ['error' => 'forbidden', 'message' => 'no', 'retriable' => false]),
+    );
+    $client = $this->syncClient();
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'P'), MutationKind::Create, [Op::set('title', 'x')], 0);
+    $client->outbox()->queue($client->key('nodes', 'p1', 'K'), MutationKind::Create, [Op::set('name', 'P')], 0);
+    $client->push('tasks', 'team-1');
+    $client->push('tasks', 'team-1');
+    $client->push('nodes', 'p1');
+
+    expect(array_column($client->outbox()->abandoned(), 'reason'))->toBe(['forbidden', 'parent_unknown'])
+        ->and($client->outbox()->mayHaveLanded($client->outbox()->abandoned()[0]['mutation']->id))->toBeTrue();
+});

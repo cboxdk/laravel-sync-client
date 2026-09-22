@@ -72,10 +72,19 @@ class HttpTransport implements SyncTransport
         if (ctype_digit($header)) {
             return (int) $header;
         }
-        // An HTTP date and nothing else: strtotime() would take "tomorrow".
-        $at = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $header, new \DateTimeZone('UTC'));
+        // An HTTP date and nothing else - strtotime() would take "tomorrow" -
+        // in any of the three forms a recipient must accept, and only if it
+        // reads back the same: createFromFormat() rolls day 32 into the next
+        // month and ignores a weekday that does not match.
+        $header = (string) preg_replace('/\s+/', ' ', $header);
+        foreach (['D, d M Y H:i:s \\G\\M\\T', 'l, d-M-y H:i:s \\G\\M\\T', 'D M j H:i:s Y'] as $format) {
+            $at = \DateTimeImmutable::createFromFormat('!'.$format, $header, new \DateTimeZone('UTC'));
+            if ($at !== false && $at->format($format) === $header) {
+                return max(0, $at->getTimestamp() - time());
+            }
+        }
 
-        return $at === false ? null : max(0, $at->getTimestamp() - time());
+        return null;
     }
 
     /** @param array<string, mixed> $body */
