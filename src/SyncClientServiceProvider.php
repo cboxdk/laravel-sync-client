@@ -59,7 +59,8 @@ class SyncClientServiceProvider extends ServiceProvider
         $this->app->singleton(Outbox::class, fn (Application $app): Outbox => Outbox::for(
             $app->make(OutboxStore::class),
             new Replica($this->required($app, 'sync-client.replica', 'sync-client.replica must be set and stable for this device.')),
-        ));
+            // So $client->outbox()->dismiss() and ->requeue() know them too.
+        )->relatedBy($this->references($app), $this->scopedBy($app)));
 
         $this->app->bindIf(Contracts\SyncHeaders::class, fn (Application $app): Contracts\SyncHeaders => new Support\ConfiguredHeaders($app->make(Repository::class)));
 

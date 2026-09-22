@@ -74,7 +74,15 @@ A server restored from a backup has forgotten writes this device already had
 acknowledged; a device restored from one has forgotten writes the server has.
 Either way the server answers `mutation_gap` with where its stream really is,
 and the client renumbers from there - downward or upward - and sends again.
-Nothing is lost: the queue only ever holds writes the server has not confirmed.
+
+With one exception: when the server has pruned the answers for positions the
+restored device is about to reuse, it cannot tell a replay from a new write and
+answers `receipt_pruned`. Every write the device still has queued on that stream
+may be one it had sent before the backup was restored, so all of them are
+abandoned as `receipt_pruned` together and counted in `abandoned`; new writes go
+out after the server's position. Check each against the server before requeueing
+it with `evenIfItMayHaveLanded: true`. A fresh install should use a fresh
+`replica` id, or the same applies to anything it queues before its first push.
 
 ## One push at a time
 

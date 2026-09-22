@@ -59,9 +59,22 @@ class HttpTransport implements SyncTransport
         // empty array - consistently, so nothing downstream would notice.
         $decoded = json_decode($response->body(), false, 512);
 
-        $retryAfter = $response->header('Retry-After');
+        return new SyncResponse($response->status(), $decoded instanceof \stdClass ? $decoded : new \stdClass, self::retryAfter($response->header('Retry-After')));
+    }
 
-        return new SyncResponse($response->status(), $decoded instanceof \stdClass ? $decoded : new \stdClass, ctype_digit($retryAfter) ? (int) $retryAfter : null);
+    /** Seconds, whichever form the header took: a number, or an HTTP date. */
+    private static function retryAfter(string $header): ?int
+    {
+        $header = trim($header);
+        if ($header === '') {
+            return null;
+        }
+        if (ctype_digit($header)) {
+            return (int) $header;
+        }
+        $at = strtotime($header);
+
+        return $at === false ? null : max(0, $at - time());
     }
 
     /** @param array<string, mixed> $body */

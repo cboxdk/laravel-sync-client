@@ -52,6 +52,11 @@ readonly class PushOutcome
          * report either way.
          */
         public ?SyncRequestFailed $pullFailure = null,
+        /**
+         * sync() only: whether the view was caught up afterwards. False when
+         * the pull failed, got no answer, or was asked to come back later.
+         */
+        public bool $pulled = false,
     ) {
         $copy = [];
         foreach ($outcomes as $outcome) {
@@ -67,12 +72,12 @@ readonly class PushOutcome
     }
 
     /** This outcome, with what the pull that followed it ran into. */
-    public function withPull(?SyncRequestFailed $failure): self
+    public function withPull(?SyncRequestFailed $failure, bool $caughtUp): self
     {
         return new self(
             $this->sent, $this->abandoned, $this->retryLater, $this->outcomes, $this->named, $this->rebased,
             $this->unauthenticated || $failure?->errorCode === 'unauthenticated',
-            $this->blockedBy, $this->httpStatus, $this->error, $this->retryAfter, $failure,
+            $this->blockedBy, $this->httpStatus, $this->error, $this->retryAfter, $failure, $caughtUp,
         );
     }
 

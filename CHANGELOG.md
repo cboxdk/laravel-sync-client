@@ -14,10 +14,11 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 - `outbox()->requeue()`, `dismiss()` and `nameOf()`.
 - **A write the server processed and refused is kept**, as abandoned under the server's status (`rejected`, `validation_failed`, `precondition_failed`), until the application dismisses it. It used to live only in the push's return value, and a pull failing after it - or the process ending - lost it without a trace. A refused create now holds back its children too; one that was answered `validation_failed` used to have its child applied pointing at a record that never existed.
 - `$client->dismiss()` takes the writes that need a dismissed create with it (`parent_abandoned`), and `requeue()` refuses a `receipt_pruned` or `protocol_violation` write unless told `evenIfItMayHaveLanded`.
-- `sync()` returns the push's outcome even when the pull fails (`pullFailure`), and a 401 on the pull sets `unauthenticated` instead of reporting all clear.
+- **Breaking:** `sync()` no longer throws when the pull fails; it returns the push's outcome with `pullFailure` and `pulled` (whether the view caught up), so the push's report is never thrown away. A 401 on the pull sets `unauthenticated` instead of reporting all clear. `pull()` returns whether it caught up.
 - **Headers are read on every request** (`Contracts\SyncHeaders`, config by default), so a token refreshed after sign-in is the one sent.
 - A 413 is final whoever answers it. When the queue stops on one write, the outcome names it (`blockedBy`, `httpStatus`, `error`, `retryAfter`).
-- A reused handle, or one another scope named differently, is no longer mapped to the wrong record; `page_size` from the config is used; two streams gapping at the same point no longer stop the drain.
+- A reused handle, or one another scope named differently, is no longer mapped to the wrong record; `page_size` from the config is used; two streams gapping at the same point no longer stop the drain. Handles should be unique on the device (a UUID).
+- A write sent more than once is treated as possibly landed: `requeue()` wants `evenIfItMayHaveLanded` for it, since the refusal may have come on a resend of a write that was applied. `$client->outbox()` knows the configured references, so dismissing through it takes a refused parent's children along. A restored stream's settled writes are all counted, and `Retry-After` is read as an HTTP date too.
 
 ### Fixed
 

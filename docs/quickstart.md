@@ -59,7 +59,9 @@ every name the server has given since.
 Nothing leaves the device. The queue is durable, so this survives being killed.
 
 `'my-handle'` is not the record's id — the server names a new record, and the
-id you sent is only what you call it in the meantime.
+id you sent is only what you call it in the meantime. Make handles unique on the
+device - a UUID is simplest: a reference to a handle is matched by type and
+handle alone, since a child may point into another scope.
 
 ## Sync
 
@@ -82,14 +84,23 @@ foreach ($outcome->named as $rename) {
 // The name is also kept, so an app that crashed before relabelling can ask:
 // $client->outbox()->nameOf($handle)
 
-// 2. Writes that were processed but did NOT land as asked. Nothing else in the
-//    system will mention these, and "sent" is not "saved".
+// 2. Writes that will never land as asked. Nothing else in the system will
+//    mention these, and "sent" is not "saved". They are kept on the device
+//    until you dismiss them, so this survives a crash between push and here.
+foreach ($client->outbox()->abandoned() as ['mutation' => $write, 'reason' => $reason]) {
+    $this->tell($write, $reason);
+    $client->dismiss($write->id);
+}
+// And those processed with a caveat - a conflict kept both values, the
+// server's value was kept over yours - which only this push reports.
 foreach ($outcome->needingAttention() as $problem) {
     $this->tell($problem);
 }
 ```
 
-If you write no other code from this page, write those two loops.
+If you write no other code from this page, write those loops. `sync()` does not
+throw: `$outcome->pulled` says whether the view caught up, and `pullFailure`
+holds what the server refused on the way.
 
 ## Read
 
@@ -124,7 +135,8 @@ You do not have to handle any of this. It is handled:
 - **A response is lost.** Re-sending carries the same mutation id, so the server
   answers from its receipt rather than applying twice.
 - **The server says reset.** The view is rebuilt from a fresh bootstrap
-  automatically, once. A second reset in a row is raised to you.
+  automatically, once. A second reset in a row comes back on `pullFailure`
+  (`pull()` on its own raises it).
 - **Two people edit the same field.** Both proposals survive; the outcome tells
   you so rather than picking silently. If you would rather the device decide -
   latest edit wins, first edit wins, or your own merge - set one line of config:

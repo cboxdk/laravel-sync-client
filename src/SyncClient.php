@@ -163,15 +163,15 @@ class SyncClient
     {
         $outcome = $this->push($type, $scope);
         try {
-            $this->pull($type, $scope, $pageSize);
+            $caughtUp = $this->pull($type, $scope, $pageSize);
         } catch (Exceptions\SyncRequestFailed $failed) {
             // The push already happened, and what it reports - writes the
             // server refused - is the application's to tell the user. Thrown
             // away with a failed pull, that report was gone for good.
-            return $outcome->withPull($failed);
+            return $outcome->withPull($failed, false);
         }
 
-        return $outcome;
+        return $outcome->withPull(null, $caughtUp);
     }
 
     /**
@@ -307,8 +307,7 @@ class SyncClient
                 // server's would renumber older replays behind it past the
                 // pruned range, and they would be applied a second time.
                 $known = $response->body->acknowledged_sequence ?? null;
-                $this->outbox->settledUnknown($mutation, is_int($known) ? $known : null);
-                $abandoned++;
+                $abandoned += $this->outbox->settledUnknown($mutation, is_int($known) ? $known : null);
 
                 continue;
             }
@@ -642,18 +641,20 @@ class SyncClient
      * in a loop would spin against a moving target rather than letting the
      * application decide to back off.
      */
-    public function pull(string $type, ?string $scope = null, ?int $pageSize = null): void
+    /** @return bool whether the view is now caught up - false when the server did not answer, or asked to come back later */
+    public function pull(string $type, ?string $scope = null, ?int $pageSize = null): bool
     {
         $pageSize ??= $this->pageSize;
         try {
-            $this->follow($type, $scope, $pageSize);
+            return $this->follow($type, $scope, $pageSize);
         } catch (Exceptions\SyncRequestFailed $failed) {
             if (! $failed->requiresReset()) {
                 throw $failed;
             }
 
             $this->resetView($type, $scope);
-            $this->follow($type, $scope, $pageSize);
+
+            return $this->follow($type, $scope, $pageSize);
         }
     }
 
@@ -677,7 +678,7 @@ class SyncClient
         $this->views->forget($type, $scope);
     }
 
-    private function follow(string $type, ?string $scope, int $pageSize): void
+    private function follow(string $type, ?string $scope, int $pageSize): bool
     {
         $request = ['type' => $type, 'scope' => $scope];
         $cursor = $this->resume($type, $scope);
@@ -690,7 +691,7 @@ class SyncClient
             do {
                 $response = $this->transport->post('bootstrap', $request + ['page_size' => $pageSize] + ($token === null ? [] : ['token' => $token]));
                 if (! $this->guard($response)) {
-                    return;
+                    return false;
                 }
                 $page = Wire::bootstrapPage($response->body, new BootstrapToken(Support\Read::string($response->body, 'token')));
                 // Remembered BEFORE the page is applied. The two are separate
@@ -710,12 +711,14 @@ class SyncClient
         while ($cursor instanceof ViewCursor) {
             $response = $this->transport->post('delta', $request + ['cursor' => ['position' => $cursor->position->value, 'context' => $cursor->context->fingerprint()]]);
             if (! $this->guard($response)) {
-                return;
+                return false;
             }
             $delta = Wire::deltaPage($response->body);
             $this->replica->applyDelta($delta);
             $cursor = $delta->hasMore ? $delta->cursor : null;
         }
+
+        return true;
     }
 
     /** The continuation token an interrupted bootstrap left behind, if any. */

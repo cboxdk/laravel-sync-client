@@ -152,3 +152,60 @@ it('sends the headers as they are now, not as they were at boot', function () {
 
     Http::assertSent(fn ($request) => $request->header('Authorization') === ['Bearer new']);
 });
+
+/** Dismissing through the outbox directly used to release a refused parent's children with its handle. */
+it('takes a refused parent\'s children with it when dismissed through the outbox directly', function () {
+    config()->set('sync-client.references', ['nodes' => ['name' => 'tasks']]);
+    $reader = $this->syncClientAs('reader');
+    $reader->outbox()->queue($reader->key('tasks', 'team-1', 'P'), MutationKind::Create, [Op::set('title', 'parent'), Op::set('status', 'open')], 0);
+    $reader->outbox()->queue($reader->key('nodes', 'p1', 'K'), MutationKind::Create, [Op::set('name', 'P'), Op::set('parent_id', 'p1')], 0);
+    $reader->push('tasks', 'team-1');
+
+    $reader->outbox()->dismiss($reader->outbox()->abandoned()[0]['mutation']->id);
+
+    expect(array_column($reader->outbox()->abandoned(), 'reason'))->toBe(['parent_abandoned']);
+});
+
+/** A restored device's whole stream is settled at once, and the outcome counts every write settled, not one. */
+it('counts every write a restored stream settles', function () {
+    $this->bindTransport(fn (): SyncTransport => new class implements SyncTransport
+    {
+        public function post(string $endpoint, array $body): SyncResponse
+        {
+            return new SyncResponse(200, (object) ['status' => 'receipt_pruned', 'acknowledged_sequence' => 10, 'reason' => 'receipt_pruned']);
+        }
+    });
+    foreach (['a', 'b', 'c'] as $id) {
+        $this->queueTask($id);
+    }
+
+    $outcome = $this->syncClient()->push('tasks', 'team-1');
+
+    expect($outcome->abandoned)->toBe(3)
+        ->and($this->outbox()->pending())->toBe(0);
+});
+
+/** A pull the server asked to repeat later reported all clear. */
+it('says when the pull after a push did not catch up', function () {
+    $this->bindTransport(fn (): SyncTransport => new class implements SyncTransport
+    {
+        public function post(string $endpoint, array $body): SyncResponse
+        {
+            return new SyncResponse(503, (object) ['error' => 'retry', 'retriable' => true], 2);
+        }
+    });
+
+    $outcome = $this->syncClient()->sync('tasks', 'team-1');
+
+    expect($outcome->pulled)->toBeFalse()
+        ->and($outcome->pullFailure)->toBeNull();
+});
+
+it('reads Retry-After as an HTTP date too', function () {
+    Http::fake(['*' => Http::response(['error' => 'retry', 'retriable' => true], 503, ['Retry-After' => gmdate('D, d M Y H:i:s', time() + 120).' GMT'])]);
+    config()->set('sync-client.url', 'https://sync.test');
+
+    $response = app(SyncTransport::class)->post('push', []);
+
+    expect($response->retryAfter)->toBeGreaterThan(100)->toBeLessThanOrEqual(120);
+});
