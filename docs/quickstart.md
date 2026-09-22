@@ -87,10 +87,22 @@ foreach ($outcome->named as $rename) {
 // 2. Writes that will never land as asked. Nothing else in the system will
 //    mention these, and "sent" is not "saved". They are kept on the device
 //    until you dismiss them, so this survives a crash between push and here.
-foreach ($client->outbox()->abandoned() as ['mutation' => $write, 'reason' => $reason]) {
-    $this->tell($write, $reason);
-    $client->dismiss($write->id);
-}
+//    Dismissing a create abandons the writes that needed it, so go round
+//    again until nothing new turns up.
+do {
+    $dismissed = 0;
+    foreach ($client->outbox()->abandoned() as ['mutation' => $write, 'reason' => $reason]) {
+        if (in_array($reason, ['receipt_pruned', 'protocol_violation', 'parent_unknown'], true)) {
+            // May already be on the server: keep it until someone has checked.
+            $this->askSomeoneToCheck($write, $reason);
+
+            continue;
+        }
+        $this->tell($write, $reason);
+        $client->dismiss($write->id);
+        $dismissed++;
+    }
+} while ($dismissed > 0);
 // And those processed with a caveat - a conflict kept both values, the
 // server's value was kept over yours - which only this push reports.
 foreach ($outcome->needingAttention() as $problem) {
@@ -98,9 +110,11 @@ foreach ($outcome->needingAttention() as $problem) {
 }
 ```
 
-If you write no other code from this page, write those loops. `sync()` does not
-throw: `$outcome->pulled` says whether the view caught up, and `pullFailure`
-holds what the server refused on the way.
+If you write no other code from this page, write those loops. A refusal from the
+pull does not throw out of `sync()`: `$outcome->pulled` says whether the view
+caught up, and `pullFailure` holds what the server refused on the way. Two
+processes contending for the device's own database still throw
+`TransientFailure` - call again.
 
 ## Read
 

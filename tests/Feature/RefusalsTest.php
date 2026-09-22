@@ -209,3 +209,62 @@ it('reads Retry-After as an HTTP date too', function () {
 
     expect($response->retryAfter)->toBeGreaterThan(100)->toBeLessThanOrEqual(120);
 });
+
+/** A scripted server: each call answers with the next response, the last one repeating. */
+function scripted(object $test, SyncResponse ...$answers): void
+{
+    $test->bindTransport(fn (): SyncTransport => new class($answers) implements SyncTransport
+    {
+        /** @param list<SyncResponse> $answers */
+        public function __construct(private array $answers) {}
+
+        public function post(string $endpoint, array $body): SyncResponse
+        {
+            return count($this->answers) > 1 ? array_shift($this->answers) : $this->answers[0];
+        }
+    });
+}
+
+/**
+ * A busy answer, then a refusal: nothing ever landed, but counting the busy
+ * answer as a possible landing turned off the cascade, and the child went out
+ * pointing at a record that never existed.
+ */
+it('takes a refused parent\'s child with it even when the parent was first answered busy', function () {
+    config()->set('sync-client.references', ['nodes' => ['name' => 'tasks']]);
+    scripted($this,
+        new SyncResponse(503, (object) ['error' => 'retry', 'retriable' => true]),
+        new SyncResponse(200, (object) ['status' => 'validation_failed', 'record_version' => 0, 'acknowledged_sequence' => 1]),
+    );
+    $client = $this->syncClient();
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'P'), MutationKind::Create, [Op::set('title', 'x')], 0);
+    $client->outbox()->queue($client->key('nodes', 'p1', 'K'), MutationKind::Create, [Op::set('name', 'P')], 0);
+    $client->push('tasks', 'team-1');
+    $client->push('tasks', 'team-1');
+
+    $cascaded = $client->dismiss($client->outbox()->abandoned()[0]['mutation']->id);
+
+    expect($cascaded)->toBe(1)
+        ->and(array_column($client->outbox()->abandoned(), 'reason'))->toBe(['parent_abandoned']);
+});
+
+/** A session that expired, then a refusal once signed in: the user's later requeue is legitimate, not a possible duplicate. */
+it('lets a write refused after an expired session be requeued', function () {
+    scripted($this,
+        new SyncResponse(401, (object) ['message' => 'Unauthenticated.']),
+        new SyncResponse(403, (object) ['error' => 'forbidden', 'message' => 'no', 'retriable' => false]),
+    );
+    $this->queueTask('t1');
+    $client = $this->syncClient();
+    $client->push('tasks', 'team-1');
+    $client->push('tasks', 'team-1');
+
+    expect($client->requeue($client->outbox()->abandoned()[0]['mutation']->id))->not->toBeNull();
+});
+
+it('reads Retry-After strictly', function () {
+    Http::fake(['*' => Http::response(['error' => 'retry', 'retriable' => true], 503, ['Retry-After' => 'tomorrow'])]);
+    config()->set('sync-client.url', 'https://sync.test');
+
+    expect(app(SyncTransport::class)->post('push', [])->retryAfter)->toBeNull();
+});

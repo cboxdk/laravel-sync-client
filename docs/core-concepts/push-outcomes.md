@@ -57,9 +57,11 @@ moment, say a permission the user has since been given - or
 `$client->dismiss($mutationId)` once the user has been told. A requeued write goes
 to the back of the queue under a new identity, because the server may hold a
 receipt for the old one. Dismissing a create abandons the writes that need its
-record as `parent_abandoned`, for you to report in turn.
+record - `parent_abandoned`, or `parent_unknown` when the create may have landed
+and its name must be found before they are requeued - for you to report in turn.
+`dismiss()` returns how many it took along.
 
-A `receipt_pruned` or `protocol_violation` write may already be on the server.
+A `receipt_pruned` or `protocol_violation` write may already be on the server, and so may any write one of whose sendings got no answer at all - the answer that refused it may have come on a resend of a write that had landed. An answered sending (busy, sign in again) did not land, and a gap or `pull_required` proves none did.
 `requeue()` refuses it unless you pass `evenIfItMayHaveLanded: true` after
 checking, because a second identity applies it twice - a create becomes two
 records.

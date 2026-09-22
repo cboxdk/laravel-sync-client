@@ -72,9 +72,10 @@ class HttpTransport implements SyncTransport
         if (ctype_digit($header)) {
             return (int) $header;
         }
-        $at = strtotime($header);
+        // An HTTP date and nothing else: strtotime() would take "tomorrow".
+        $at = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $header);
 
-        return $at === false ? null : max(0, $at - time());
+        return $at === false ? null : max(0, $at->getTimestamp() - time());
     }
 
     /** @param array<string, mixed> $body */

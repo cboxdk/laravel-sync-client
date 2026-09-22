@@ -61,8 +61,9 @@ try {
 }
 ```
 
-Every other failure — a rejected request, an unknown type, a busy server —
-is thrown as it always was. Recovery is for a reset and nothing else, because
+Every other refusal — a rejected request, an unknown type — is thrown from
+`pull()` as it always was (`sync()` puts it on `pullFailure` instead). A busy
+server is not a refusal: `pull()` returns false and the next one carries on. Recovery is for a reset and nothing else, because
 silently rebuilding on any failure would turn one bad request into a full
 re-download on every sync.
 
