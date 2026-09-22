@@ -74,6 +74,8 @@ class SyncClient
         private readonly Contracts\PushLock $lock = new Support\NoLock,
         /** @var array<string, array<string, string>> entity type => [field => the type it points at] */
         private readonly array $references = [],
+        /** @var array<string, string> entity type => the type whose id is its scope */
+        private readonly array $scopedBy = [],
     ) {}
 
     /**
@@ -196,16 +198,14 @@ class SyncClient
         }
 
         try {
-            return $this->drain($type, $scope, []);
+            return $this->drain($type, $scope);
         } finally {
             $this->lock->release();
         }
     }
 
-    /** @param list<string> $draining the (type, scope) pairs already being drained above this one */
-    private function drain(string $type, ?string $scope, array $draining): PushOutcome
+    private function drain(string $type, ?string $scope): PushOutcome
     {
-        $draining[] = $type."\0".($scope ?? self::UNSCOPED);
         $sent = 0;
         $abandoned = 0;
         $resumed = null;
@@ -214,33 +214,33 @@ class SyncClient
         $rebased = 0;
         /** @var array<string, int> $refusals */
         $refusals = [];
+        $label = $scope ?? self::UNSCOPED;
 
-        // Only this type's queue, in this scope. The outbox holds every write
-        // this device has made, and the wire carries the type and scope named
-        // here rather than the mutation's own - so draining anything wider
-        // would submit another type's or another tenant's writes as these.
-        while (($mutation = $this->outbox->head($type, $scope ?? self::UNSCOPED)) !== null) {
-            // A parent created offline goes before the child that points at it,
+        // Only this type's queue, in this scope - the wire carries the type and
+        // scope the mutation was queued under, and draining anything wider
+        // would submit another type's or another tenant's writes.
+        while (($next = $this->outbox->peek($type, $label)) !== null) {
+            // A parent created offline goes first - exactly its create, from
             // whatever type or scope it was queued under - so the child's
-            // reference is rewritten to the parent's real id before it is sent,
-            // not left holding a handle the server never heard of.
-            $parent = $this->unsentParent($mutation, $draining);
-            if ($parent !== null) {
-                $first = $this->drain($parent->type, $parent->space === self::UNSCOPED ? null : $parent->space, $draining);
-                $sent += $first->sent;
-                $abandoned += $first->abandoned;
-                $rebased += $first->rebased;
-                $outcomes = [...$outcomes, ...$first->outcomes];
-                $named = [...$named, ...$first->named];
-                if ($first->retryLater) {
-                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased, unauthenticated: $first->unauthenticated);
-                }
+            // reference (or its scope) is rewritten to the parent's real id
+            // before the child is sent. A parent that was abandoned will not
+            // exist, and a child pointing at it is abandoned with it rather than
+            // sent holding a handle the server never heard of.
+            [$choice, $orphaned] = $this->nextToSend($next, []);
+            if ($orphaned) {
+                $this->outbox->abandon($choice, 'parent_abandoned');
+                $abandoned++;
 
                 continue;
             }
+            $mutation = $choice->id === $next->id ? $this->outbox->head($type, $label) : $this->outbox->take($choice->id);
+            if ($mutation === null) {
+                continue;
+            }
+            $sendScope = $mutation->entity->space === self::UNSCOPED ? null : $mutation->entity->space;
 
             $pull = $this->rebase !== null && ($refusals[$mutation->id] ?? 0) < self::REBASE_ATTEMPTS;
-            $response = $this->transport->post('push', ['type' => $type, 'scope' => $scope]
+            $response = $this->transport->post('push', ['type' => $mutation->entity->type, 'scope' => $sendScope]
                 + Wire::mutationToWire($mutation)
                 + ($pull ? ['on_conflict' => 'pull'] : []));
 
@@ -273,6 +273,18 @@ class SyncClient
                 return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
             }
 
+            if ($status === 'receipt_pruned') {
+                // This write may already have been applied, and its answer is
+                // gone: final, never resent - but the stream goes on from where
+                // the server says it is.
+                $acknowledged = $response->body->acknowledged_sequence ?? 0;
+                $this->outbox->abandon($mutation, 'receipt_pruned');
+                $this->outbox->resumeAfter($mutation, is_int($acknowledged) ? $acknowledged : 0);
+                $abandoned++;
+
+                continue;
+            }
+
             if ($status === 'mutation_gap') {
                 $acknowledged = $response->body->acknowledged_sequence ?? 0;
                 $acknowledged = is_int($acknowledged) ? $acknowledged : 0;
@@ -295,9 +307,14 @@ class SyncClient
                 $rename = $this->named($mutation, $response);
                 // One step: the create leaves the queue and everything behind it
                 // is renamed together, or neither happens.
-                $this->outbox->acknowledged($mutation, $rename?->named, $this->references);
+                $this->outbox->acknowledged($mutation, $rename?->named, $this->references, $this->scopedBy);
                 if ($rename !== null) {
                     $named[] = $rename;
+                    // The scope being drained was this record's handle: what
+                    // was queued under it now lives under its name.
+                    if (($this->scopedBy[$type] ?? null) === $rename->handle->type && $rename->handle->id === $label) {
+                        $label = $rename->named->id;
+                    }
                 }
                 $sent++;
 
@@ -328,26 +345,52 @@ class SyncClient
     }
 
     /**
-     * A record this write points at through a declared reference that is
-     * still waiting to be sent, and is not already being drained above us.
+     * What has to be sent before this write: the deepest unsent create it
+     * depends on, through its scope or a declared reference - or itself.
+     * The flag is set when that dependency was abandoned, and names the write
+     * that has to be abandoned with it.
      *
-     * @param  list<string>  $draining
+     * @param  list<string>  $seen  identities already on this path, so a cycle
+     *                              of references ends instead of looping
+     * @return array{0: Mutation, 1: bool}
      */
-    private function unsentParent(Mutation $mutation, array $draining): ?EntityKey
+    private function nextToSend(Mutation $mutation, array $seen): array
     {
+        $seen[] = $mutation->id;
+        $parents = [];
+        $scopeType = $this->scopedBy[$mutation->entity->type] ?? null;
+        if ($scopeType !== null) {
+            $parents[] = [$scopeType, $mutation->entity->space];
+        }
         foreach ($this->references[$mutation->entity->type] ?? [] as $field => $target) {
             foreach ($mutation->operations as $operation) {
-                if ($operation->field !== $field || ! $operation->value->exists || ! is_string($operation->value->value())) {
-                    continue;
-                }
-                $parent = $this->outbox->queuedKey($target, $operation->value->value());
-                if ($parent !== null && ! $parent->equals($mutation->entity) && ! in_array($parent->type."\0".$parent->space, $draining, true)) {
-                    return $parent;
+                $value = $operation->value->exists ? $operation->value->value() : null;
+                if ($operation->field === $field && is_string($value)) {
+                    $parents[] = [$target, $value];
                 }
             }
         }
 
-        return null;
+        foreach ($parents as [$parentType, $parentId]) {
+            $create = $this->outbox->queuedCreate($parentType, $parentId);
+            if ($create !== null && ! in_array($create->id, $seen, true)) {
+                return $this->nextToSend($create, $seen);
+            }
+            if ($create === null && $this->outbox->createAbandoned($parentType, $parentId)) {
+                return [$mutation, true];
+            }
+        }
+
+        return [$mutation, false];
+    }
+
+    /**
+     * Send an abandoned write again, under every name the server has given
+     * since - the record, the scope it lives in, the records it points at.
+     */
+    public function requeue(string $mutationId): ?Mutation
+    {
+        return $this->outbox->requeue($mutationId, $this->references, $this->scopedBy);
     }
 
     /**
@@ -500,6 +543,7 @@ class SyncClient
             return match ($status) {
                 MutationStatus::MutationGap->value => 'mutation_gap',
                 MutationStatus::PullRequired->value => 'pull_required',
+                MutationStatus::ReceiptPruned->value => 'receipt_pruned',
                 default => 'processed',
             };
         }

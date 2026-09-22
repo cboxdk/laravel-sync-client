@@ -77,4 +77,15 @@ return [
 
     'references' => [],
 
+    /*
+    | Types whose scope is another record's id - items that live inside a
+    | project, say. An item queued under a project created offline is queued
+    | under the project's handle; when the project is named, those writes move
+    | to its real id, and a push of the item sends the project first.
+    |
+    |     'items' => 'projects',
+    */
+
+    'scoped_by' => [],
+
 ];

@@ -55,7 +55,7 @@ class TestCase extends BaseTestCase
 
         $app['config']->set('sync.api.enabled', true);
         $app['config']->set('sync.api.middleware', []);
-        $app['config']->set('sync.api.types', ['tasks' => TaskType::class, 'nodes' => NodeType::class]);
+        $app['config']->set('sync.api.types', ['tasks' => TaskType::class, 'nodes' => NodeType::class, 'items' => Fixtures\ItemType::class]);
         $app->bind(SyncPrincipals::class, HeaderPrincipals::class);
 
         $app['config']->set('sync-client.url', 'http://localhost/sync');

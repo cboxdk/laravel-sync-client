@@ -174,7 +174,7 @@ it('catches up when this device is behind the server', function () {
     }
     $client->push('nodes', 'p1');
     // As restored from before the second write was acknowledged.
-    app(OutboxStore::class)->resetAcknowledged($client->outbox()->stream($client->key('nodes', 'p1', 'x')), 'p1', 1);
+    app(OutboxStore::class)->resetAcknowledged($client->outbox()->stream($client->key('nodes', 'p1', 'x')), 'p1', 1, 2);
     foreach (['c', 'd', 'e'] as $id) {
         $client->outbox()->queue($client->key('nodes', 'p1', $id), MutationKind::Create, [Op::set('name', $id), Op::set('parent_id', 'p1')], 0);
     }

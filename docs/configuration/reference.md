@@ -15,6 +15,7 @@ description: "Every key in config/sync-client.php."
 | `database` | `SYNC_CLIENT_DATABASE` | `storage/sync/replica.sqlite` | Local SQLite file |
 | `page_size` | `SYNC_CLIENT_PAGE_SIZE` | `100` | Records per bootstrap page |
 | `references` | — | `[]` | Per entity type, `field => the type it points at`. A push sends an unsent parent first and rewrites the field to its real id |
+| `scoped_by` | — | `[]` | `type => the type whose id is its scope`. Writes queued under a parent's handle move to its name, and the parent is sent first |
 | `rebase` | — | `null` | A `RebasePolicy` class. Null lets the server decide conflicts; a policy makes this device decide them. See [Deciding conflicts on the device](../core-concepts/rebasing.md) |
 
 There is no retry or backoff setting. Whether to retry depends on which

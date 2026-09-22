@@ -83,6 +83,7 @@ class SyncClientServiceProvider extends ServiceProvider
             $this->rebasePolicy($app),
             new Support\FileLock($this->text($app, 'sync-client.database', '').'.lock'),
             $this->references($app),
+            $this->scopedBy($app),
         ));
     }
 
@@ -91,6 +92,20 @@ class SyncClientServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__.'/../config/sync-client.php' => $this->app->configPath('sync-client.php')], 'sync-client-config');
         }
+    }
+
+    /** @return array<string, string> */
+    private function scopedBy(Application $app): array
+    {
+        $configured = $app->make(Repository::class)->get('sync-client.scoped_by');
+        $scopedBy = [];
+        foreach (is_array($configured) ? $configured : [] as $type => $parent) {
+            if (is_string($type) && is_string($parent)) {
+                $scopedBy[$type] = $parent;
+            }
+        }
+
+        return $scopedBy;
     }
 
     /** @return array<string, array<string, string>> */
