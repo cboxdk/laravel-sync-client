@@ -64,9 +64,10 @@ queued again or named, under every name the server has given since.
 Nothing leaves the device. The queue is durable, so this survives being killed.
 
 `'my-handle'` is not the record's id — the server names a new record, and the
-id you sent is only what you call it in the meantime. Make handles unique on the
+id you sent is only what you call it in the meantime. Handles must be unique on the
 device - a UUID is simplest: a reference to a handle is matched by type and
-handle alone, since a child may point into another scope.
+handle alone, since a child may point into another scope, so queueing a create
+whose handle is already used for a record in another scope is refused.
 
 ## Sync
 

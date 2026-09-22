@@ -26,7 +26,7 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 - **Breaking:** `sync()` no longer throws when the pull fails; it returns the push's outcome with `pullFailure` and `pulled` (whether the view caught up), so the push's report is never thrown away. A 401 on the pull sets `unauthenticated` instead of reporting all clear. `pull()` returns whether it caught up.
 - **Headers are read on every request** (`Contracts\SyncHeaders`, config by default), so a token refreshed after sign-in is the one sent.
 - A 413 is final whoever answers it. When the queue stops on one write, the outcome names it (`blockedBy`, `httpStatus`, `error`, `retryAfter`).
-- A reused handle, or one another scope named differently, is no longer mapped to the wrong record; `page_size` from the config is used; two streams gapping at the same point no longer stop the drain. Handles should be unique on the device (a UUID).
+- A reused handle, or one another scope named differently, is no longer mapped to the wrong record; `page_size` from the config is used; two streams gapping at the same point no longer stop the drain. Handles must be unique on the device (a UUID): a create reusing a handle from another scope is refused.
 - `$client->outbox()` knows the configured references, so dismissing through it takes a refused parent's children along. A restored stream's settled writes are all counted, and `Retry-After` is read as an HTTP date too - in all three forms, in GMT, and only when it is a real date.
 
 ### Fixed
