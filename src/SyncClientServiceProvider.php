@@ -82,6 +82,7 @@ class SyncClientServiceProvider extends ServiceProvider
             $app->make(ViewIndex::class),
             $this->rebasePolicy($app),
             new Support\FileLock($this->text($app, 'sync-client.database', '').'.lock'),
+            $this->references($app),
         ));
     }
 
@@ -90,6 +91,20 @@ class SyncClientServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__.'/../config/sync-client.php' => $this->app->configPath('sync-client.php')], 'sync-client-config');
         }
+    }
+
+    /** @return array<string, list<string>> */
+    private function references(Application $app): array
+    {
+        $configured = $app->make(Repository::class)->get('sync-client.references');
+        $references = [];
+        foreach (is_array($configured) ? $configured : [] as $type => $fields) {
+            if (is_string($type) && is_array($fields)) {
+                $references[$type] = array_values(array_filter($fields, is_string(...)));
+            }
+        }
+
+        return $references;
     }
 
     /** Null unless configured: the server's resolver decides, as it always has. */

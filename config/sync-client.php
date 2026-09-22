@@ -58,4 +58,21 @@ return [
 
     'rebase' => null, // \Cbox\Sync\Client\Laravel\Rebase\KeepMine::class
 
+    /*
+    |--------------------------------------------------------------------------
+    | References
+    |--------------------------------------------------------------------------
+    |
+    | Fields that hold another record's id, per entity type. A record created
+    | offline is known by a handle until the server names it; a child queued
+    | under it carries that handle. Listed here, those fields are rewritten to
+    | the real id before the child is sent. Unlisted, the child reaches the
+    | server pointing at an id that never existed.
+    |
+    |     'tasks' => ['project_id', 'assignee_id'],
+    |
+    */
+
+    'references' => [],
+
 ];

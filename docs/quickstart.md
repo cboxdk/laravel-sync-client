@@ -36,6 +36,17 @@ The key is the type, the scope you will sync it under, and an id. A push for
 `team-1` only ever sends writes queued for `team-1`; for a type with no scope,
 pass `null`.
 
+A record that points at another one created offline - a task under a new project
+- can use the project's handle as the reference. List the field and the client
+rewrites it to the real id before the task is sent:
+
+```php
+// config/sync-client.php, next to the keys already there
+return [
+    'references' => ['tasks' => ['project_id']],
+];
+```
+
 Nothing leaves the device. The queue is durable, so this survives being killed.
 
 `'my-handle'` is not the record's id — the server names a new record, and the

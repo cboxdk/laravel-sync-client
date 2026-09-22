@@ -146,3 +146,18 @@ it('remembers what a created record was named', function () {
 
     expect($this->syncClientAs('alice')->outbox()->nameOf($handle)?->id)->toMatch('/^[0-9a-f-]{36}$/');
 });
+
+/** A parent and child both created offline: the child arrives pointing at the parent's real id. */
+it('sends a child created offline pointing at its parent\'s real id', function () {
+    config()->set('sync-client.references', ['nodes' => ['parent_id']]);
+    $client = $this->syncClientAs('alice');
+    $parent = $client->key('nodes', 'p1', 'parent-handle');
+    $client->outbox()->queue($parent, MutationKind::Create, [Op::set('name', 'parent'), Op::set('parent_id', 'p1')], 0);
+    $client->outbox()->queue($client->key('nodes', 'p1', 'child-handle'), MutationKind::Create, [Op::set('name', 'child'), Op::set('parent_id', 'parent-handle')], 0);
+
+    $outcome = $client->push('nodes', 'p1');
+
+    $parentId = $outcome->named[0]->named->id;
+    $child = app(Store::class)->record(new EntityKey('team-1', 'nodes', $outcome->named[1]->named->id));
+    expect($child?->value('parent_id')->value())->toBe($parentId);
+});

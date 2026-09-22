@@ -72,6 +72,8 @@ class SyncClient
         private readonly ViewIndex $views,
         private ?RebasePolicy $rebase = null,
         private readonly Contracts\PushLock $lock = new Support\NoLock,
+        /** @var array<string, list<string>> entity type => fields holding another record's id */
+        private readonly array $references = [],
     ) {}
 
     /**
@@ -265,7 +267,7 @@ class SyncClient
                 $rename = $this->named($mutation, $response);
                 // One step: the create leaves the queue and everything behind it
                 // is renamed together, or neither happens.
-                $this->outbox->acknowledged($mutation, $rename?->named);
+                $this->outbox->acknowledged($mutation, $rename?->named, $this->references);
                 if ($rename !== null) {
                     $named[] = $rename;
                 }
