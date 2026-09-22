@@ -196,14 +196,16 @@ class SyncClient
         }
 
         try {
-            return $this->drain($type, $scope);
+            return $this->drain($type, $scope, []);
         } finally {
             $this->lock->release();
         }
     }
 
-    private function drain(string $type, ?string $scope): PushOutcome
+    /** @param list<string> $draining the (type, scope) pairs already being drained above this one */
+    private function drain(string $type, ?string $scope, array $draining): PushOutcome
     {
+        $draining[] = $type."\0".($scope ?? self::UNSCOPED);
         $sent = 0;
         $abandoned = 0;
         $resumed = null;
@@ -218,6 +220,25 @@ class SyncClient
         // here rather than the mutation's own - so draining anything wider
         // would submit another type's or another tenant's writes as these.
         while (($mutation = $this->outbox->head($type, $scope ?? self::UNSCOPED)) !== null) {
+            // A parent created offline goes before the child that points at it,
+            // whatever type or scope it was queued under - so the child's
+            // reference is rewritten to the parent's real id before it is sent,
+            // not left holding a handle the server never heard of.
+            $parent = $this->unsentParent($mutation, $draining);
+            if ($parent !== null) {
+                $first = $this->drain($parent->type, $parent->space === self::UNSCOPED ? null : $parent->space, $draining);
+                $sent += $first->sent;
+                $abandoned += $first->abandoned;
+                $rebased += $first->rebased;
+                $outcomes = [...$outcomes, ...$first->outcomes];
+                $named = [...$named, ...$first->named];
+                if ($first->retryLater) {
+                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased, unauthenticated: $first->unauthenticated);
+                }
+
+                continue;
+            }
+
             $pull = $this->rebase !== null && ($refusals[$mutation->id] ?? 0) < self::REBASE_ATTEMPTS;
             $response = $this->transport->post('push', ['type' => $type, 'scope' => $scope]
                 + Wire::mutationToWire($mutation)
@@ -304,6 +325,29 @@ class SyncClient
         }
 
         return new PushOutcome($sent, $abandoned, retryLater: false, outcomes: $outcomes, named: $named, rebased: $rebased);
+    }
+
+    /**
+     * A record this write points at through a declared reference that is
+     * still waiting to be sent, and is not already being drained above us.
+     *
+     * @param  list<string>  $draining
+     */
+    private function unsentParent(Mutation $mutation, array $draining): ?EntityKey
+    {
+        foreach ($this->references[$mutation->entity->type] ?? [] as $field => $target) {
+            foreach ($mutation->operations as $operation) {
+                if ($operation->field !== $field || ! $operation->value->exists || ! is_string($operation->value->value())) {
+                    continue;
+                }
+                $parent = $this->outbox->queuedKey($target, $operation->value->value());
+                if ($parent !== null && ! $parent->equals($mutation->entity) && ! in_array($parent->type."\0".$parent->space, $draining, true)) {
+                    return $parent;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -66,9 +66,10 @@ return [
     | Fields that hold another record's id, per entity type, each naming the
     | type it points at. A record created offline is known by a handle until
     | the server names it; a child queued under it carries that handle. Listed
-    | here, the field is rewritten to the real id when the parent is named -
-    | so push the parent's type before the child's. Unlisted, the child reaches
-    | the server pointing at an id that never existed.
+    | here, a push sends the unsent parent first - from whatever scope it was
+    | queued under - and rewrites the field to its real id before the child
+    | goes. Unlisted, the child reaches the server pointing at an id that never
+    | existed.
     |
     |     'tasks' => ['project_id' => 'projects', 'assignee_id' => 'users'],
     |

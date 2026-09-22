@@ -38,8 +38,9 @@ pass `null`.
 
 A record that points at another one created offline - a task under a new project
 - can use the project's handle as the reference. List the field and the type it
-points at, and the client rewrites it to the real id when the project is named.
-Sync the project's type before the task's, so that happens before the task goes:
+points at: a push sends the unsent project first - whatever scope it was queued
+under - and rewrites the task's field to the project's real id before the task
+goes:
 
 ```php
 // config/sync-client.php, next to the keys already there

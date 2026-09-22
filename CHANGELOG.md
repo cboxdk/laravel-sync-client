@@ -8,7 +8,7 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 
 - **Decide conflicts on the device.** `'rebase' => KeepMine::class` (or `TakeTheirs`, or your own `RebasePolicy` / `Using` closure) turns on pull-before-push: a stale edit is refused, the policy is asked about each contested field, and the same write goes again knowing what it replaces. After three refusals the server keeps both values; a busy record can delay a write, never lose it.
 - `key()` and `record()` queue and read by type and scope, without the application knowing the server's space mapping.
-- `references` config (`'tasks' => ['project_id' => 'projects']`): a field holding a handle of the named type is rewritten to the real id when that record is named.
+- `references` config (`'tasks' => ['project_id' => 'projects']`): a push sends an unsent parent first, from whatever scope it was queued under, and rewrites the child's field to the parent's real id before the child goes.
 - `outbox()->requeue()`, `dismiss()` and `nameOf()`.
 
 ### Fixed

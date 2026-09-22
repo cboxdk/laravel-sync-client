@@ -185,3 +185,25 @@ it('catches up when this device is behind the server', function () {
         ->and($outcome->abandoned)->toBe(0)
         ->and($client->outbox()->pending())->toBe(0);
 });
+
+/**
+ * The child's scope is pushed and the parent's never is - the order used to be
+ * the application's problem, and the child reached the server holding a handle
+ * nobody had heard of. The parent now goes first, and the child is rewritten.
+ */
+it('sends an unsent parent first, from any scope, before the child that points at it', function () {
+    config()->set('sync-client.references', ['nodes' => ['parent_id' => 'nodes']]);
+    $client = $this->syncClientAs('alice');
+    $client->outbox()->queue($client->key('nodes', 'p1', 'parent-handle'), MutationKind::Create, [Op::set('name', 'parent'), Op::set('parent_id', 'p1')], 0);
+    $client->outbox()->queue($client->key('nodes', 'parent-handle', 'child-handle'), MutationKind::Create, [Op::set('name', 'child'), Op::set('parent_id', 'parent-handle')], 0);
+
+    $outcome = $client->push('nodes', 'parent-handle');
+
+    expect($outcome->sent)->toBe(2)->and($client->outbox()->pending())->toBe(0);
+    $names = [];
+    foreach ($outcome->named as $rename) {
+        $names[$rename->handle->id] = $rename->named->id;
+    }
+    $child = app(Store::class)->record(new EntityKey('team-1', 'nodes', $names['child-handle']));
+    expect($child?->value('parent_id')->value())->toBe($names['parent-handle']);
+});
