@@ -7,12 +7,14 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 ### Upgrading
 
 - The device's SQLite file is brought up to date in place on first use: new outbox columns and a names table. Writes queued before the upgrade count as sent once, so one refused later needs `evenIfItMayHaveLanded` to be requeued. Back the file up first; downgrading is not supported.
+- **A redirect is never followed** - it would carry the device's credentials to whatever host it named. A `sync-client.url` that only worked through one (http to https, a moved host) now gets `redirected`: set it to the server's final https URL.
 - **Breaking:** `sync()` no longer throws when the pull fails - check `pullFailure` and `pulled`. A write the server refused stays in `outbox()->abandoned()` until you `dismiss()` it.
 - Each type and scope now travels on its own replica stream. Writes queued before the upgrade keep the stream they were queued on.
 - Queue writes under the scope you push with - `$client->key($type, $scope, $id)`. A write queued under another label is no longer sent by that push.
 
 ### Added
 
+- `Contracts\PushLock` is bound in the container: bind your own to decide how one push at a time is enforced.
 - **Decide conflicts on the device.** `'rebase' => KeepMine::class` (or `TakeTheirs`, or your own `RebasePolicy` / `Using` closure) turns on pull-before-push: a stale edit is refused, the policy is asked about each contested field, and the same write goes again knowing what it replaces. After three refusals the server keeps both values; a busy record can delay a write, never lose it.
 - `key()` and `record()` queue and read by type and scope, without the application knowing the server's space mapping.
 - `references` (`'tasks' => ['project_id' => 'projects']`) and `scoped_by` (`'items' => 'projects'`): a push sends exactly the unsent parent's create first, from wherever it was queued, and rewrites the child's field or scope to the parent's real id before the child goes. A child whose parent was refused is abandoned with it (`parent_abandoned`), and `$client->requeue()` brings writes back under every name given since.
@@ -22,7 +24,6 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 - **A write the server processed and refused is kept**, as abandoned under the server's status (`rejected`, `validation_failed`, `precondition_failed`), until the application dismisses it. It used to live only in the push's return value, and a pull failing after it - or the process ending - lost it without a trace. A refused create now holds back its children too; one that was answered `validation_failed` used to have its child applied pointing at a record that never existed.
 - `$client->dismiss()` takes the writes that need a dismissed create with it - `parent_abandoned`, or `parent_unknown` when the create may have landed - and returns how many. `requeue()` refuses a write that may already be on the server - `receipt_pruned`, `protocol_violation`, or one with a sending that got no answer - unless told `evenIfItMayHaveLanded`. A write queued when a device upgraded from 0.4 has no record of its earlier sendings, and counts as sent once. A push abandons a child as `parent_unknown` when its parent may have landed, and a write that needs a record whose create was abandoned or dismissed and never named requeues only once that record is requeued or named with `outbox()->found($handle, $name)`. `outbox()->mayHaveLanded($id)` tells the application which abandoned writes to check before dismissing; the quickstart keeps those.
 - **Breaking:** `sync()` no longer throws when the pull fails; it returns the push's outcome with `pullFailure` and `pulled` (whether the view caught up), so the push's report is never thrown away. A 401 on the pull sets `unauthenticated` instead of reporting all clear. `pull()` returns whether it caught up.
-- **A redirect is never followed**: it would carry the device's credentials to whatever host it named.
 - **Headers are read on every request** (`Contracts\SyncHeaders`, config by default), so a token refreshed after sign-in is the one sent.
 - A 413 is final whoever answers it. When the queue stops on one write, the outcome names it (`blockedBy`, `httpStatus`, `error`, `retryAfter`).
 - A reused handle, or one another scope named differently, is no longer mapped to the wrong record; `page_size` from the config is used; two streams gapping at the same point no longer stop the drain. Handles should be unique on the device (a UUID).

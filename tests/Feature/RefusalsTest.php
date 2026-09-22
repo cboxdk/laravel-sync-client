@@ -368,3 +368,15 @@ it('does not follow a redirect with the device\'s credentials', function () {
     expect($response->status)->toBe(302);
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'elsewhere.test'));
 });
+
+/** With redirects never followed, a URL that only worked through one left sync silently stuck. */
+it('names a redirect as a configuration problem on push and pull', function () {
+    scripted($this, new SyncResponse(308, new stdClass));
+    $this->queueTask('t1');
+
+    $outcome = $this->syncClient()->sync('tasks', 'team-1');
+
+    expect($outcome->retryLater)->toBeTrue()
+        ->and($outcome->error)->toBe('redirected')
+        ->and($outcome->pullFailure?->errorCode)->toBe('redirected');
+});

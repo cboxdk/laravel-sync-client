@@ -8,7 +8,7 @@ description: "Every key in config/sync-client.php."
 
 | Key | Env | Default | Meaning |
 |---|---|---|---|
-| `url` | `SYNC_CLIENT_URL` | — | The server's sync prefix |
+| `url` | `SYNC_CLIENT_URL` | — | The server's sync prefix, as its final https URL: a redirect is never followed - it would carry the device's credentials along - and is reported as `redirected` |
 | `headers` | — | `[]` | Whatever the server's middleware expects. Read on every request, so `config()->set('sync-client.headers.Authorization', ...)` after the user signs in again takes effect at once; bind `Contracts\SyncHeaders` to read a token from anywhere else |
 | `timeout` | `SYNC_CLIENT_TIMEOUT` | `30` | Seconds per request |
 | `replica` | `SYNC_CLIENT_REPLICA` | — | This device's stream id. Stable for the life of the local database |

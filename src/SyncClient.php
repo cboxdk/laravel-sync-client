@@ -232,7 +232,7 @@ class SyncClient
         $wait = function (Mutation $blocked, SyncResponse $response, bool $unauthenticated = false) use (&$sent, &$abandoned, &$outcomes, &$named, &$rebased): PushOutcome {
             return new PushOutcome(
                 $sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased, unauthenticated: $unauthenticated,
-                blockedBy: $blocked->id, httpStatus: $response->status, error: $response->error(), retryAfter: $response->retryAfter,
+                blockedBy: $blocked->id, httpStatus: $response->status, error: self::redirected($response) ? 'redirected' : $response->error(), retryAfter: $response->retryAfter,
             );
         };
 
@@ -782,6 +782,12 @@ class SyncClient
      * Only a considered refusal - one that names an error - is worth raising,
      * because only that tells the caller something it can act on.
      */
+    /** A redirect: never followed, so the configured URL is not the server's final one. */
+    private static function redirected(SyncResponse $response): bool
+    {
+        return $response->status >= 300 && $response->status < 400;
+    }
+
     private function guard(SyncResponse $response): bool
     {
         if ($response->ok()) {
@@ -792,6 +798,12 @@ class SyncClient
             // taking that for a non-answer left a device with an expired
             // session reporting all clear while it stopped receiving anything.
             throw new Exceptions\SyncRequestFailed('unauthenticated', 401);
+        }
+        if (self::redirected($response)) {
+            // Never followed - it would carry the device's credentials along -
+            // so a URL that only works through a redirect never works. Said
+            // by name, not left as silence.
+            throw new Exceptions\SyncRequestFailed('redirected', $response->status, 'sync-client.url must be the final https URL of the server');
         }
         if ($response->error() === null || $response->retriable()) {
             // Not an answer, or "come back later": the view stays where it
