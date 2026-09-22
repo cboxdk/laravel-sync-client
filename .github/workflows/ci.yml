@@ -41,6 +41,9 @@ jobs:
       - name: Audit locked dependencies
         run: composer audit --locked
 
+      - name: Check documentation examples parse
+        run: php bin/lint-docs.php
+
       - name: Check dependency licenses
         run: php bin/check-licenses.php
 

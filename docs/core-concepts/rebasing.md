@@ -16,8 +16,10 @@ screen for picking.
 **With a rebase policy the device decides.** One line of config:
 
 ```php
-// config/sync-client.php
-'rebase' => \Cbox\Sync\Client\Laravel\Rebase\KeepMine::class,
+// config/sync-client.php, next to the keys already there
+return [
+    'rebase' => \Cbox\Sync\Client\Laravel\Rebase\KeepMine::class,
+];
 ```
 
 or at runtime:

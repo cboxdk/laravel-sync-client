@@ -58,12 +58,12 @@ class SyncClientServiceProvider extends ServiceProvider
 
         $this->app->singleton(Outbox::class, fn (Application $app): Outbox => Outbox::for(
             $app->make(OutboxStore::class),
-            new Replica($this->text($app, 'sync-client.replica', '') ?: throw new \RuntimeException('sync-client.replica must be set and stable for this device.')),
+            new Replica($this->required($app, 'sync-client.replica', 'sync-client.replica must be set and stable for this device.')),
         ));
 
         $this->app->bindIf(SyncTransport::class, fn (Application $app): SyncTransport => new HttpTransport(
             $app->make(Factory::class),
-            $this->text($app, 'sync-client.url', '') ?: throw new \RuntimeException('sync-client.url must point at the sync server.'),
+            $this->required($app, 'sync-client.url', 'sync-client.url must point at the sync server.'),
             $this->headers($app),
             $this->number($app, 'sync-client.timeout', 30),
         ));
@@ -112,6 +112,13 @@ class SyncClientServiceProvider extends ServiceProvider
         $pdo = $app->make(\PDO::class.'@sync-client');
 
         return $pdo instanceof \PDO ? $pdo : throw new \RuntimeException('The sync client connection is not a PDO handle.');
+    }
+
+    private function required(Application $app, string $key, string $why): string
+    {
+        $value = $this->text($app, $key, '');
+
+        return $value !== '' ? $value : throw new \RuntimeException($why);
     }
 
     private function text(Application $app, string $key, string $fallback): string
