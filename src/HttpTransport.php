@@ -73,7 +73,7 @@ class HttpTransport implements SyncTransport
             return (int) $header;
         }
         // An HTTP date and nothing else: strtotime() would take "tomorrow".
-        $at = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $header);
+        $at = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $header, new \DateTimeZone('UTC'));
 
         return $at === false ? null : max(0, $at->getTimestamp() - time());
     }

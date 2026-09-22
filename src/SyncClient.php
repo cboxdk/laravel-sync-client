@@ -360,17 +360,18 @@ class SyncClient
 
             if ($status === 'retry') {
                 // Retrying is safe only under the same identity, so the queue
-                // stays untouched and in order. This sending was answered, so
-                // it did not land.
-                $this->outbox->answered($mutation);
-
+                // stays untouched and in order. Not counted as answered: a
+                // gateway's JSON timeout lands here too, and a server's own
+                // "busy" after a dropped connection may follow a COMMIT that
+                // went through.
                 return $wait($mutation, $response);
             }
 
             if ($status === 'unauthenticated') {
                 // About the session, not the write. Abandoning here turned one
                 // expired token into every queued write lost; the queue waits
-                // for the user to sign in again instead.
+                // for the user to sign in again instead. Answered before
+                // anything ran: this sending did not land.
                 $this->outbox->answered($mutation);
 
                 return $wait($mutation, $response, true);

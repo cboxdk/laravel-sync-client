@@ -89,12 +89,14 @@ foreach ($outcome->named as $rename) {
 //    until you dismiss them, so this survives a crash between push and here.
 //    Dismissing a create abandons the writes that needed it, so go round
 //    again until nothing new turns up.
+$keep = [];
 do {
     $dismissed = 0;
     foreach ($client->outbox()->abandoned() as ['mutation' => $write, 'reason' => $reason]) {
         if (in_array($reason, ['receipt_pruned', 'protocol_violation', 'parent_unknown'], true)) {
-            // May already be on the server: keep it until someone has checked.
-            $this->askSomeoneToCheck($write, $reason);
+            // May already be on the server, or needs a record that may be:
+            // keep it until someone has checked.
+            $keep[$write->id] = [$write, $reason];
 
             continue;
         }
@@ -103,12 +105,20 @@ do {
         $dismissed++;
     }
 } while ($dismissed > 0);
+foreach ($keep as [$write, $reason]) {
+    $this->askSomeoneToCheck($write, $reason);
+}
 // And those processed with a caveat - a conflict kept both values, the
 // server's value was kept over yours - which only this push reports.
 foreach ($outcome->needingAttention() as $problem) {
     $this->tell($problem);
 }
 ```
+
+A kept create that turns out to exist on the server: tell the outbox its name
+with `$client->outbox()->found($handle, $name)`, then `$client->requeue()` the
+writes that waited for it. One that does not exist: requeue it with
+`evenIfItMayHaveLanded: true`, or dismiss it.
 
 If you write no other code from this page, write those loops. A refusal from the
 pull does not throw out of `sync()`: `$outcome->pulled` says whether the view

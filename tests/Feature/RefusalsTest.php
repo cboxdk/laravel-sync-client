@@ -268,3 +268,30 @@ it('reads Retry-After strictly', function () {
 
     expect(app(SyncTransport::class)->post('push', [])->retryAfter)->toBeNull();
 });
+
+/** A gateway's JSON timeout may follow a write that went through; counting it as an answer let a later refusal be requeued into a duplicate. */
+it('keeps a write that met a gateway timeout as possibly landed', function () {
+    scripted($this,
+        new SyncResponse(504, (object) ['error' => 'gateway_timeout']),
+        new SyncResponse(403, (object) ['error' => 'forbidden', 'message' => 'no', 'retriable' => false]),
+    );
+    $this->queueTask('t1');
+    $client = $this->syncClient();
+    $client->push('tasks', 'team-1');
+    $client->push('tasks', 'team-1');
+
+    expect(fn () => $client->requeue($client->outbox()->abandoned()[0]['mutation']->id))->toThrow(InvalidRequest::class);
+});
+
+it('reads a Retry-After date as GMT whatever the app timezone', function () {
+    $zone = date_default_timezone_get();
+    date_default_timezone_set('America/Los_Angeles');
+    try {
+        Http::fake(['*' => Http::response(['error' => 'retry', 'retriable' => true], 503, ['Retry-After' => gmdate('D, d M Y H:i:s', time() + 120).' GMT'])]);
+        config()->set('sync-client.url', 'https://sync.test');
+
+        expect(app(SyncTransport::class)->post('push', [])->retryAfter)->toBeGreaterThan(100)->toBeLessThanOrEqual(120);
+    } finally {
+        date_default_timezone_set($zone);
+    }
+});
