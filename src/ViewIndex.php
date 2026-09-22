@@ -40,9 +40,10 @@ class ViewIndex
 
     public function remember(string $type, ?string $scope, string $fingerprint): void
     {
-        $selector = self::selector($type, $scope);
-        $this->pdo->prepare('DELETE FROM sync_client_views_index WHERE selector = ?')->execute([$selector]);
-        $this->pdo->prepare('INSERT INTO sync_client_views_index (selector, fingerprint) VALUES (?, ?)')->execute([$selector, $fingerprint]);
+        // One statement: a delete and an insert are two commits, and a crash
+        // between them forgot the view outright.
+        $this->pdo->prepare('INSERT INTO sync_client_views_index (selector, fingerprint) VALUES (?, ?) ON CONFLICT (selector) DO UPDATE SET fingerprint = excluded.fingerprint')
+            ->execute([self::selector($type, $scope), $fingerprint]);
     }
 
     public function forget(string $type, ?string $scope): void

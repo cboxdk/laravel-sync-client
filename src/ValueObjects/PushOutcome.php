@@ -27,6 +27,13 @@ readonly class PushOutcome
         public bool $retryLater,
         array $outcomes = [],
         array $named = [],
+        /** Writes that met a newer edit and were rethought by the rebase policy before landing. */
+        public int $rebased = 0,
+        /**
+         * The server did not recognise this device's credentials. Nothing was
+         * dropped; sign in again and sync.
+         */
+        public bool $unauthenticated = false,
     ) {
         $copy = [];
         foreach ($outcomes as $outcome) {

@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace Cbox\Sync\Client\Laravel;
 
+use Cbox\Sync\Client\Laravel\Contracts\RebasePolicy;
 use Cbox\Sync\Client\Laravel\Contracts\SyncTransport;
 use Cbox\Sync\Client\Laravel\Support\Wire;
 use Cbox\Sync\Client\Laravel\ValueObjects\PushOutcome;
+use Cbox\Sync\Client\Laravel\ValueObjects\StaleField;
 use Cbox\Sync\Client\Laravel\ValueObjects\SyncResponse;
 use Cbox\Sync\Client\Outbox;
+use Cbox\Sync\Data\EntityRecord;
+use Cbox\Sync\Data\FieldOperation;
 use Cbox\Sync\Data\Mutation;
+use Cbox\Sync\Enums\ConflictDecision;
 use Cbox\Sync\Enums\MutationStatus;
 use Cbox\Sync\ValueObjects\EntityKey;
+use Cbox\Sync\ValueObjects\FieldValue;
+use Cbox\Sync\ValueObjects\RecordVersion;
 use Cbox\Sync\Views\BootstrapToken;
 use Cbox\Sync\Views\MultiViewClient;
 use Cbox\Sync\Views\ViewCursor;
@@ -25,12 +32,62 @@ use Cbox\Sync\Views\ViewCursor;
  */
 class SyncClient
 {
+    /**
+     * How many times one write is rethought before the server is left to
+     * decide. Each refusal means someone else wrote the same field in the
+     * meantime; past this, retrying is racing a busy record, and preserving
+     * both values loses nothing.
+     */
+    public const REBASE_ATTEMPTS = 3;
+
+    /**
+     * The space to queue under for a type that has no scope.
+     *
+     * A queued write is keyed by the scope it will be pushed under, so that a
+     * push for one tenant never sends another tenant's work. A type with no
+     * scope still needs a key; this is it, and it is never sent to the server.
+     */
+    public const UNSCOPED = '~';
+
+    /**
+     * The server's answers that refuse a write for good. Everything else is
+     * either a success, a pause, or not the server speaking at all.
+     */
+    private const TERMINAL = [
+        'invalid_request',
+        'invalid_field_value',
+        'too_many_operations',
+        'field_not_writable',
+        'body_too_large',
+        'unsupported_media_type',
+        'forbidden',
+        'unknown_type',
+        'protocol_violation',
+    ];
+
     public function __construct(
         private readonly SyncTransport $transport,
         private readonly Outbox $outbox,
         private readonly MultiViewClient $replica,
         private readonly ViewIndex $views,
+        private ?RebasePolicy $rebase = null,
+        private readonly Contracts\PushLock $lock = new Support\NoLock,
     ) {}
+
+    /**
+     * Decide conflicts on this device instead of on the server.
+     *
+     * With a policy, a write that meets a newer edit of the same field is
+     * refused rather than preserved; the policy is asked what the edit should
+     * now be, and it is sent again, knowing what it replaces. Null goes back
+     * to letting the server's resolver decide.
+     */
+    public function rebaseWith(?RebasePolicy $policy): static
+    {
+        $this->rebase = $policy;
+
+        return $this;
+    }
 
     public function replica(): MultiViewClient
     {
@@ -59,6 +116,32 @@ class SyncClient
      * the same operation, which is what lets a missed signal cost promptness
      * rather than correctness.
      */
+    /**
+     * The key to queue a write under: this type, in this scope.
+     *
+     * The id is the record's name once the server has given it one, or a
+     * handle you made up for a record you are creating.
+     */
+    public function key(string $type, ?string $scope, string $id): EntityKey
+    {
+        return new EntityKey($scope ?? self::UNSCOPED, $type, $id);
+    }
+
+    /**
+     * A record as this device last saw it, by the names the application uses.
+     *
+     * The replica keys records by the server's space, which is the server's own
+     * mapping of type and scope - a Laravel model scoped by team_id lives in
+     * "tasks:team-1", not "team-1". This finds it without the application
+     * having to know that mapping. Null before the view's first sync.
+     */
+    public function record(string $type, ?string $scope, string $id): ?EntityRecord
+    {
+        $space = $this->space($type, $scope);
+
+        return $space === null ? null : $this->replica->record(new EntityKey($space, $type, $id));
+    }
+
     public function sync(string $type, ?string $scope = null, int $pageSize = 100): PushOutcome
     {
         $outcome = $this->push($type, $scope);
@@ -89,20 +172,47 @@ class SyncClient
         return $this->replica->contextFor($fingerprint)?->space;
     }
 
+    /**
+     * Only one push at a time per device.
+     *
+     * A queue worker and a scheduler draining together would send the same
+     * head under the same number, and a late answer to one could be read as
+     * the other's. When another push holds the lock this returns at once with
+     * retryLater: the one already running is doing the work.
+     */
     public function push(string $type, ?string $scope = null): PushOutcome
+    {
+        if (! $this->lock->acquire()) {
+            return new PushOutcome(0, 0, retryLater: true);
+        }
+
+        try {
+            return $this->drain($type, $scope);
+        } finally {
+            $this->lock->release();
+        }
+    }
+
+    private function drain(string $type, ?string $scope): PushOutcome
     {
         $sent = 0;
         $abandoned = 0;
         $resumed = null;
         $outcomes = [];
         $named = [];
+        $rebased = 0;
+        /** @var array<string, int> $refusals */
+        $refusals = [];
 
-        // Only this type's queue. The outbox holds every write this device has
-        // made, and the wire payload carries no type of its own - the server
-        // takes it from the `type` field - so draining the whole queue here
-        // would submit another type's writes as this one.
-        while (($mutation = $this->outbox->head($type)) !== null) {
-            $response = $this->transport->post('push', ['type' => $type, 'scope' => $scope] + Wire::mutationToWire($mutation));
+        // Only this type's queue, in this scope. The outbox holds every write
+        // this device has made, and the wire carries the type and scope named
+        // here rather than the mutation's own - so draining anything wider
+        // would submit another type's or another tenant's writes as these.
+        while (($mutation = $this->outbox->head($type, $scope ?? self::UNSCOPED)) !== null) {
+            $pull = $this->rebase !== null && ($refusals[$mutation->id] ?? 0) < self::REBASE_ATTEMPTS;
+            $response = $this->transport->post('push', ['type' => $type, 'scope' => $scope]
+                + Wire::mutationToWire($mutation)
+                + ($pull ? ['on_conflict' => 'pull'] : []));
 
             $status = $this->protocolStatus($response);
             if ($status === null) {
@@ -110,7 +220,27 @@ class SyncClient
                 // timeout, an empty body. The queue is left exactly as it is.
                 // Acknowledging would lose the write; abandoning would lose it
                 // permanently, and a transient outage would drain everything.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named);
+                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+            }
+
+            if ($status === 'pull_required' && $this->rebase !== null) {
+                // Nothing was stored, so the same mutation goes again - rethought
+                // against what the refusal reported. Pulling first is not needed
+                // for that: the refusal carries exactly the fields in question,
+                // and sync() pulls the rest straight after.
+                if (! $this->rebaseOnto($mutation, $response, $this->rebase)) {
+                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+                }
+                $refusals[$mutation->id] = ($refusals[$mutation->id] ?? 0) + 1;
+                $rebased++;
+
+                continue;
+            }
+            if ($status === 'pull_required') {
+                // Only ever sent on_conflict=pull with a policy in hand, so this
+                // is a server answering a question it was not asked. Leaving the
+                // queue alone is the one response that cannot lose the write.
+                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
             }
 
             if ($status === 'mutation_gap') {
@@ -121,7 +251,7 @@ class SyncClient
                 // never help, and looping against a live server is far worse
                 // than stopping and letting the caller see it.
                 if ($resumed === $acknowledged) {
-                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named);
+                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
                 }
                 $resumed = $acknowledged;
                 $this->outbox->resumeAfter($mutation, $acknowledged);
@@ -132,8 +262,10 @@ class SyncClient
 
             if ($status === 'processed') {
                 $outcomes[] = $this->outcome($mutation, $response);
-                $this->outbox->acknowledged($mutation);
                 $rename = $this->named($mutation, $response);
+                // One step: the create leaves the queue and everything behind it
+                // is renamed together, or neither happens.
+                $this->outbox->acknowledged($mutation, $rename?->named);
                 if ($rename !== null) {
                     $named[] = $rename;
                 }
@@ -145,7 +277,14 @@ class SyncClient
             if ($status === 'retry') {
                 // Retrying is safe only under the same identity, so the queue
                 // stays untouched and in order.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named);
+                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+            }
+
+            if ($status === 'unauthenticated') {
+                // About the session, not the write. Abandoning here turned one
+                // expired token into every queued write lost; the queue waits
+                // for the user to sign in again instead.
+                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased, unauthenticated: true);
             }
 
             // Terminal for this identity. It leaves the queue rather than
@@ -155,7 +294,61 @@ class SyncClient
             $abandoned++;
         }
 
-        return new PushOutcome($sent, $abandoned, retryLater: false, outcomes: $outcomes, named: $named);
+        return new PushOutcome($sent, $abandoned, retryLater: false, outcomes: $outcomes, named: $named, rebased: $rebased);
+    }
+
+    /**
+     * Put the rethought write in the queue in place of the refused one.
+     *
+     * Based on the version the refusal reported, never on anything pulled
+     * since: a newer pull can include changes to fields the refusal did not
+     * mention, and basing on it would overwrite them without anyone having
+     * looked. If there are any, the server simply refuses again and names them.
+     *
+     * False when the refusal is not readable, which leaves the queue alone.
+     */
+    private function rebaseOnto(Mutation $mutation, SyncResponse $response, RebasePolicy $policy): bool
+    {
+        $version = $response->body->record_version ?? null;
+        if (! is_int($version)) {
+            return false;
+        }
+
+        /** @var array<string, ?FieldValue> $stale */
+        $stale = [];
+        foreach ((array) ($response->body->conflicts ?? []) as $conflict) {
+            $field = is_object($conflict) ? ($conflict->field ?? null) : null;
+            if (! is_string($field)) {
+                return false;
+            }
+            $current = $conflict->current ?? null;
+            $stale[$field] = $current instanceof \stdClass
+                ? (($current->present ?? false) === true ? FieldValue::of($current->value ?? null) : FieldValue::missing())
+                : null;
+        }
+
+        $operations = [];
+        foreach ($mutation->operations as $operation) {
+            if (! array_key_exists($operation->field, $stale)) {
+                $operations[] = $operation;
+
+                continue;
+            }
+            $choice = $policy->rebase(new StaleField(
+                $mutation->entity->type,
+                $mutation->entity->id,
+                $operation->field,
+                $operation->value,
+                $stale[$operation->field],
+            ));
+            if ($choice->value !== null) {
+                $operations[] = new FieldOperation($operation->field, $choice->value);
+            }
+        }
+
+        $this->outbox->rebase($mutation, new RecordVersion($version), $operations);
+
+        return true;
     }
 
     /**
@@ -174,10 +367,7 @@ class SyncClient
             return null;
         }
 
-        $named = new EntityKey($mutation->entity->space, $mutation->entity->type, $name);
-        $this->outbox->rekey($mutation->entity, $named);
-
-        return new ValueObjects\RecordNamed($mutation->entity, $named);
+        return new ValueObjects\RecordNamed($mutation->entity, new EntityKey($mutation->entity->space, $mutation->entity->type, $name));
     }
 
     private function outcome(Mutation $mutation, SyncResponse $response): ValueObjects\MutationOutcome
@@ -198,6 +388,13 @@ class SyncClient
         }
         $reason = $response->body->reason ?? null;
         $status = $response->body->status ?? null;
+        $decisions = [];
+        foreach ((array) ($response->body->decisions ?? []) as $field => $decision) {
+            $known = is_string($decision) ? ConflictDecision::tryFrom($decision) : null;
+            if ($known !== null) {
+                $decisions[(string) $field] = $known;
+            }
+        }
 
         return new ValueObjects\MutationOutcome(
             $mutation->id,
@@ -208,6 +405,7 @@ class SyncClient
             is_string($reason) ? $reason : null,
             $groups,
             $codes,
+            $decisions,
         );
     }
 
@@ -227,15 +425,32 @@ class SyncClient
                 return null;
             }
 
-            return $status === MutationStatus::MutationGap->value ? 'mutation_gap' : 'processed';
+            return match ($status) {
+                MutationStatus::MutationGap->value => 'mutation_gap',
+                MutationStatus::PullRequired->value => 'pull_required',
+                default => 'processed',
+            };
         }
 
         $error = $response->error();
         if ($error === null) {
             return null;
         }
+        if ($response->status === 401) {
+            return 'unauthenticated';
+        }
+        if ($response->retriable()) {
+            return 'retry';
+        }
 
-        return $response->retriable() ? 'retry' : 'terminal';
+        // Terminal only when the server named a refusal of THIS write. A JSON
+        // body with some "error" key is not enough: a gateway's 502, a rate
+        // limiter's 429 and a proxy's own error pages speak JSON too, and
+        // treating those as final drained the queue on the first hiccup.
+        // Anything unrecognised is left in place to be tried again.
+        return $response->status >= 400 && $response->status < 500 && $response->status !== 429 && in_array($error, self::TERMINAL, true)
+            ? 'terminal'
+            : 'retry';
     }
 
     /**
@@ -301,8 +516,15 @@ class SyncClient
                     return;
                 }
                 $page = Wire::bootstrapPage($response->body, new BootstrapToken(Support\Read::string($response->body, 'token')));
-                $this->replica->applyBootstrap($page);
+                // Remembered BEFORE the page is applied. The two are separate
+                // commits, and the other order leaves a crash between them
+                // with a replica expecting the next page of a bootstrap this
+                // device no longer knows it started - every later pull then
+                // opens a fresh one and is refused as out of order, for good.
+                // This way round a crash leaves a fingerprint with no context
+                // behind it, which simply starts the bootstrap again.
                 $this->views->remember($type, $scope, $page->context->fingerprint());
+                $this->replica->applyBootstrap($page);
                 $token = $page->nextToken?->value;
                 $cursor = $page->cursor;
             } while ($token !== null);

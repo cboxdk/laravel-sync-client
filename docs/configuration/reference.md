@@ -14,7 +14,8 @@ description: "Every key in config/sync-client.php."
 | `replica` | `SYNC_CLIENT_REPLICA` | — | This device's stream id. Stable for the life of the local database |
 | `database` | `SYNC_CLIENT_DATABASE` | `storage/sync/replica.sqlite` | Local SQLite file |
 | `page_size` | `SYNC_CLIENT_PAGE_SIZE` | `100` | Records per bootstrap page |
+| `rebase` | — | `null` | A `RebasePolicy` class. Null lets the server decide conflicts; a policy makes this device decide them. See [Deciding conflicts on the device](../core-concepts/rebasing.md) |
 
-There is no retry or backoff setting. Whether to retry depends on which of the
-four answers the server gave, not on a timer, so it is a decision the client
+There is no retry or backoff setting. Whether to retry depends on which
+answer the server gave, not on a timer, so it is a decision the client
 makes rather than a number you configure.

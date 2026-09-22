@@ -15,6 +15,6 @@ with each answer the server gives.
 ## Sections
 
 - [Getting started](getting-started/_index.md)
-- [Core concepts](core-concepts/_index.md) — the four push outcomes
+- [Core concepts](core-concepts/_index.md) — the push outcomes, and deciding conflicts on the device
 - [Configuration](configuration/_index.md)
 - [Security](security/_index.md)

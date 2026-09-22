@@ -6,6 +6,7 @@ namespace Cbox\Sync\Client\Laravel;
 
 use Cbox\Sync\Client\Contracts\ClientState;
 use Cbox\Sync\Client\Contracts\OutboxStore;
+use Cbox\Sync\Client\Laravel\Contracts\RebasePolicy;
 use Cbox\Sync\Client\Laravel\Contracts\SyncTransport;
 use Cbox\Sync\Client\Outbox;
 use Cbox\Sync\Client\Pdo\PdoClientState;
@@ -79,6 +80,8 @@ class SyncClientServiceProvider extends ServiceProvider
             $app->make(Outbox::class),
             $app->make(MultiViewClient::class),
             $app->make(ViewIndex::class),
+            $this->rebasePolicy($app),
+            new Support\FileLock($this->text($app, 'sync-client.database', '').'.lock'),
         ));
     }
 
@@ -87,6 +90,20 @@ class SyncClientServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__.'/../config/sync-client.php' => $this->app->configPath('sync-client.php')], 'sync-client-config');
         }
+    }
+
+    /** Null unless configured: the server's resolver decides, as it always has. */
+    private function rebasePolicy(Application $app): ?RebasePolicy
+    {
+        $class = $app->make(Repository::class)->get('sync-client.rebase');
+        if ($class === null || $class === '') {
+            return null;
+        }
+        $policy = is_string($class) ? $app->make($class) : $class;
+
+        return $policy instanceof RebasePolicy
+            ? $policy
+            : throw new \RuntimeException('sync-client.rebase must name a class implementing '.RebasePolicy::class.'.');
     }
 
     /** The container is untyped, so the one place that resolves the handle narrows it. */

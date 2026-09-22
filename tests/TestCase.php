@@ -64,7 +64,7 @@ class TestCase extends BaseTestCase
     }
 
     /** Binds a transport that talks to this same application, then resolves the client. */
-    protected function syncClientAs(string $principal): SyncClient
+    public function syncClientAs(string $principal): SyncClient
     {
         $this->app->bind(
             SyncTransport::class,
@@ -76,7 +76,7 @@ class TestCase extends BaseTestCase
     }
 
     /** Drops every singleton that holds local state, the way a process restart would. */
-    protected function restartDevice(): void
+    public function restartDevice(): void
     {
         foreach ([
             SyncClient::class,
@@ -105,6 +105,11 @@ class TestCase extends BaseTestCase
             new MultiViewClient(new InMemoryClientState),
             $index,
         );
+    }
+
+    public function secondDeviceFor(string $principal, string $replicaId): SyncClient
+    {
+        return $this->secondDevice($principal, $replicaId);
     }
 
     /** @param \Closure(): SyncTransport $factory */
@@ -171,8 +176,10 @@ class TestCase extends BaseTestCase
         parent::tearDown();
         // A test that never resolved the client leaves no file behind, and
         // unlinking a missing one is a warning PHPUnit will not suppress.
-        if ($this->replicaDatabase !== '' && is_file($this->replicaDatabase)) {
-            unlink($this->replicaDatabase);
+        foreach ([$this->replicaDatabase, $this->replicaDatabase.'.lock'] as $file) {
+            if ($this->replicaDatabase !== '' && is_file($file)) {
+                unlink($file);
+            }
         }
     }
 }

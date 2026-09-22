@@ -41,4 +41,21 @@ return [
 
     'page_size' => (int) env('SYNC_CLIENT_PAGE_SIZE', 100),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Conflicts
+    |--------------------------------------------------------------------------
+    |
+    | Null: the server decides, and by default keeps both values for someone to
+    | choose between. A RebasePolicy class: this device decides instead. A write
+    | that meets a newer edit of the same field is refused, the policy says what
+    | it should now be, and it is sent again knowing what it replaces.
+    |
+    | Shipped: KeepMine (latest deliberate edit wins) and TakeTheirs (first to
+    | reach the server wins). Write your own to merge per field.
+    |
+    */
+
+    'rebase' => null, // \Cbox\Sync\Client\Laravel\Rebase\KeepMine::class
+
 ];

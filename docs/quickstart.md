@@ -22,15 +22,19 @@ new stream and re-sends everything it has not had acknowledged.
 ## Write, offline
 
 ```php
-$outbox = app(Outbox::class);
+$client = app(SyncClient::class);
 
-$outbox->queue(
-    new EntityKey('team-1', 'tasks', 'my-handle'),
+$client->outbox()->queue(
+    $client->key('tasks', 'team-1', 'my-handle'),
     MutationKind::Create,
     [FieldOperation::set('title', 'Ship it'), FieldOperation::set('status', 'open')],
     baseVersion: 0,
 );
 ```
+
+The key is the type, the scope you will sync it under, and an id. A push for
+`team-1` only ever sends writes queued for `team-1`; for a type with no scope,
+pass `null`.
 
 Nothing leaves the device. The queue is durable, so this survives being killed.
 
@@ -55,6 +59,8 @@ not seen its own edits yet.
 foreach ($outcome->named as $rename) {
     $this->relabel($rename->handle->id, $rename->named->id);
 }
+// The name is also kept, so an app that crashed before relabelling can ask:
+// $client->outbox()->nameOf($handle)
 
 // 2. Writes that were processed but did NOT land as asked. Nothing else in the
 //    system will mention these, and "sent" is not "saved".
@@ -68,9 +74,10 @@ If you write no other code from this page, write those two loops.
 ## Read
 
 ```php
-$record = app(SyncClient::class)->replica()->record($entity);
+$record = app(SyncClient::class)->record('tasks', 'team-1', $id);
 
 $record?->value('title')->value();
+$record?->version->value; // send this as baseVersion when you edit it
 ```
 
 ## Stay current without polling hard
@@ -92,9 +99,14 @@ sync prompt; the cursor is what makes it correct.
 You do not have to handle any of this. It is handled:
 
 - **The network drops.** The queue is untouched and `retryLater` is true.
+- **The session expires.** The queue is untouched, `unauthenticated` is true.
+  Sign the user in again and sync; nothing was dropped.
 - **A response is lost.** Re-sending carries the same mutation id, so the server
   answers from its receipt rather than applying twice.
 - **The server says reset.** The view is rebuilt from a fresh bootstrap
   automatically, once. A second reset in a row is raised to you.
 - **Two people edit the same field.** Both proposals survive; the outcome tells
-  you so rather than picking silently.
+  you so rather than picking silently. If you would rather the device decide -
+  latest edit wins, first edit wins, or your own merge - set one line of config:
+  `'rebase' => KeepMine::class`. See
+  [Deciding conflicts on the device](core-concepts/rebasing.md).

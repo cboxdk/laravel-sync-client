@@ -6,7 +6,14 @@ use Cbox\Sync\Data\FieldOperation as Op;
 use Cbox\Sync\Enums\MutationKind;
 use Cbox\Sync\ValueObjects\EntityKey;
 
-function node(string $id): EntityKey
+/** Queued under the scope it is pushed with: a push only ever sends its own scope's writes. */
+function node(string $id, string $scope = 'p1'): EntityKey
+{
+    return new EntityKey($scope, 'nodes', $id);
+}
+
+/** Where the server keeps it: NodeType maps every scope to team-1. */
+function stored(string $id): EntityKey
 {
     return new EntityKey('team-1', 'nodes', $id);
 }
@@ -37,7 +44,7 @@ it('carries an awkward nested document through the wire without reshaping it', f
     $this->drain($client, 'nodes', 'p1');
     $client->pull('nodes', 'p1');
 
-    $doc = $client->replica()->record($this->named(node('n1')))?->value('doc')->value();
+    $doc = $client->replica()->record($this->named(stored('n1')))?->value('doc')->value();
 
     // The shapes that a naive associative decode would flatten into each other.
     expect($doc?->emptyObject)->toBeInstanceOf(stdClass::class);
@@ -60,7 +67,7 @@ it('treats a round-tripped document as unchanged when it is written back verbati
     $this->drain($client, 'nodes', 'p1');
     $client->pull('nodes', 'p1');
 
-    $record = $client->replica()->record($this->named(node('n1'))) ?? throw new LogicException('expected a record');
+    $record = $client->replica()->record($this->named(stored('n1'))) ?? throw new LogicException('expected a record');
     $version = $record->version->value;
 
     // Read it back out and write exactly what we got. If anything reshaped the
@@ -70,7 +77,7 @@ it('treats a round-tripped document as unchanged when it is written back verbati
     $this->drain($client, 'nodes', 'p1');
     $client->pull('nodes', 'p1');
 
-    expect($client->replica()->record($this->named(node('n1')))?->version->value)->toBe($version);
+    expect($client->replica()->record($this->named(stored('n1')))?->version->value)->toBe($version);
 });
 
 it('reports a nested conflict with enough to resolve it, without the other proposal', function () {
@@ -93,8 +100,8 @@ it('reports a nested conflict with enough to resolve it, without the other propo
     // Alice syncs and sees the canonical branch; bob's proposal is preserved on
     // the server but deliberately not delivered by this transport.
     $alice->pull('nodes', 'p1');
-    expect($alice->replica()->record($this->named(node('n1')))?->value('doc')->value()->title)->toBe('alice');
-    expect($alice->replica()->record($this->named(node('n1')))?->value('doc')->value()->tags)->toBe(['x']);
+    expect($alice->replica()->record($this->named(stored('n1')))?->value('doc')->value()->title)->toBe('alice');
+    expect($alice->replica()->record($this->named(stored('n1')))?->value('doc')->value()->tags)->toBe(['x']);
 });
 
 it('moves a child between parents across two views on the same device', function () {
@@ -104,20 +111,20 @@ it('moves a child between parents across two views on the same device', function
 
     $client->pull('nodes', 'p1');
     $client->pull('nodes', 'p2');
-    expect($client->replica()->belongsTo($this->named(node('n1')), 'under-p1'))->toBeTrue();
-    expect($client->replica()->belongsTo($this->named(node('n1')), 'under-p2'))->toBeFalse();
+    expect($client->replica()->belongsTo($this->named(stored('n1')), 'under-p1'))->toBeTrue();
+    expect($client->replica()->belongsTo($this->named(stored('n1')), 'under-p2'))->toBeFalse();
 
-    $client->outbox()->queue($this->named(node('n1')), MutationKind::Update, [Op::set('parent_id', 'p2')], 1);
+    $client->outbox()->queue($this->named(node('n1', 'p2')), MutationKind::Update, [Op::set('parent_id', 'p2')], 1);
     $this->drain($client, 'nodes', 'p2');
 
     // Both views have to be pulled: one sees a removal, the other an entry.
     $client->pull('nodes', 'p1');
     $client->pull('nodes', 'p2');
 
-    expect($client->replica()->belongsTo($this->named(node('n1')), 'under-p1'))->toBeFalse();
-    expect($client->replica()->belongsTo($this->named(node('n1')), 'under-p2'))->toBeTrue();
+    expect($client->replica()->belongsTo($this->named(stored('n1')), 'under-p1'))->toBeFalse();
+    expect($client->replica()->belongsTo($this->named(stored('n1')), 'under-p2'))->toBeTrue();
     // It survives the removal because the other view still owns it.
-    expect($client->replica()->record($this->named(node('n1'))))->not->toBeNull();
+    expect($client->replica()->record($this->named(stored('n1'))))->not->toBeNull();
 });
 
 it('distinguishes a field set to null from one that was unset, end to end', function () {
@@ -130,7 +137,7 @@ it('distinguishes a field set to null from one that was unset, end to end', func
     $this->drain($client, 'nodes', 'p1');
     $client->pull('nodes', 'p1');
 
-    $afterNull = $client->replica()->record($this->named(node('n1')))?->value('doc');
+    $afterNull = $client->replica()->record($this->named(stored('n1')))?->value('doc');
     expect($afterNull?->exists)->toBeTrue();
     expect($afterNull?->value())->toBeNull();
 
@@ -138,6 +145,6 @@ it('distinguishes a field set to null from one that was unset, end to end', func
     $this->drain($client, 'nodes', 'p1');
     $client->pull('nodes', 'p1');
 
-    $afterUnset = $client->replica()->record($this->named(node('n1')))?->value('doc');
+    $afterUnset = $client->replica()->record($this->named(stored('n1')))?->value('doc');
     expect($afterUnset?->exists)->toBeFalse();
 });
