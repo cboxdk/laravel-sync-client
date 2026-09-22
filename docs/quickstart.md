@@ -37,13 +37,14 @@ The key is the type, the scope you will sync it under, and an id. A push for
 pass `null`.
 
 A record that points at another one created offline - a task under a new project
-- can use the project's handle as the reference. List the field and the client
-rewrites it to the real id before the task is sent:
+- can use the project's handle as the reference. List the field and the type it
+points at, and the client rewrites it to the real id when the project is named.
+Sync the project's type before the task's, so that happens before the task goes:
 
 ```php
 // config/sync-client.php, next to the keys already there
 return [
-    'references' => ['tasks' => ['project_id']],
+    'references' => ['tasks' => ['project_id' => 'projects']],
 ];
 ```
 

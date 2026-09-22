@@ -78,6 +78,8 @@ decide without seeing it.
 ## What the server still decides
 
 A policy only ever gets the cases the server would otherwise have kept both
-values for. If the host's resolver settles a field as client-wins or
+values for. A field the resolver settled for the server is dropped from the
+resent write - the refusal says which - so rebasing can never win a field the
+host said the device must lose. If the host's resolver settles a field as client-wins or
 server-wins, or rejects conflicting writes outright, that still happens
 exactly as before. The device cannot use this to get around the server's rules.

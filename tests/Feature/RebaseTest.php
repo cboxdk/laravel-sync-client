@@ -10,7 +10,9 @@ use Cbox\Sync\Client\Laravel\ValueObjects\RebaseChoice;
 use Cbox\Sync\Client\Laravel\ValueObjects\StaleField;
 use Cbox\Sync\Contracts\ConflictResolver;
 use Cbox\Sync\Contracts\Store;
+use Cbox\Sync\Data\ConflictContext;
 use Cbox\Sync\Data\FieldOperation as Op;
+use Cbox\Sync\Enums\ConflictDecision;
 use Cbox\Sync\Enums\MutationKind;
 use Cbox\Sync\Enums\MutationStatus;
 use Cbox\Sync\Resolvers\ServerWins;
@@ -154,4 +156,39 @@ it('does not report a write the server overrode as applied', function () {
     expect($result->overridden())->toBe(['title'])
         ->and($result->applied())->toBeFalse()
         ->and($outcome->needingAttention())->toHaveCount(1);
+});
+
+/**
+ * A field the resolver kept for the server is settled, not stale. Rebased onto
+ * the reported version it would no longer look like a conflict, and the device
+ * would win a field the host said it must lose.
+ */
+it('never takes back a field the server kept', function () {
+    $this->app->instance(ConflictResolver::class, new class implements ConflictResolver
+    {
+        public function resolve(ConflictContext $context): ConflictDecision
+        {
+            return $context->operation->field === 'meta' ? ConflictDecision::Server : ConflictDecision::Preserve;
+        }
+    });
+    [$alice, $bob, $key] = sharedTask($this);
+    $alice->outbox()->queue($key, MutationKind::Update, [Op::set('title', 'alice-title'), Op::set('meta', 'alice-meta')], 1);
+    $bob->outbox()->queue($key, MutationKind::Update, [Op::set('title', 'bob-title'), Op::set('meta', 'bob-meta')], 1);
+    $bob->sync('tasks', 'team-1');
+
+    $alice->rebaseWith(new KeepMine)->sync('tasks', 'team-1');
+
+    expect(app(Store::class)->record($key)?->value('meta')->value())->toBe('bob-meta')
+        ->and(app(Store::class)->record($key)?->value('title')->value())->toBe('alice-title');
+});
+
+/** Queueing an edit on what record() returns is the natural next step; it has to reach the server. */
+it('hands back a record that can be edited and pushed under its scope', function () {
+    [$alice, , $key] = sharedTask($this);
+    $record = $alice->record('tasks', 'team-1', $key->id) ?? throw new LogicException('expected the record');
+
+    $alice->outbox()->queue($record->entity, MutationKind::Update, [Op::set('title', 'edited')], $record->version->value);
+
+    expect($alice->sync('tasks', 'team-1')->sent)->toBe(1)
+        ->and(app(Store::class)->record($key)?->value('title')->value())->toBe('edited');
 });

@@ -51,12 +51,13 @@ permission the user has since been given - or `dismiss($mutationId)` once the
 user has been told. A requeued write goes to the back of the queue under a new
 identity, because the server may hold a receipt for the old one.
 
-## When the server is behind
+## When one side restored a backup
 
 A server restored from a backup has forgotten writes this device already had
-acknowledged. It answers `mutation_gap` with where it really is, and the client
-renumbers from there - downward as well as up - and sends again. Nothing is lost:
-the queue only ever held writes the server had not confirmed.
+acknowledged; a device restored from one has forgotten writes the server has.
+Either way the server answers `mutation_gap` with where its stream really is,
+and the client renumbers from there - downward or upward - and sends again.
+Nothing is lost: the queue only ever holds writes the server has not confirmed.
 
 ## One push at a time
 

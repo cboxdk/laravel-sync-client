@@ -72,7 +72,7 @@ class SyncClient
         private readonly ViewIndex $views,
         private ?RebasePolicy $rebase = null,
         private readonly Contracts\PushLock $lock = new Support\NoLock,
-        /** @var array<string, list<string>> entity type => fields holding another record's id */
+        /** @var array<string, array<string, string>> entity type => [field => the type it points at] */
         private readonly array $references = [],
     ) {}
 
@@ -140,8 +140,15 @@ class SyncClient
     public function record(string $type, ?string $scope, string $id): ?EntityRecord
     {
         $space = $this->space($type, $scope);
+        $record = $space === null ? null : $this->replica->record(new EntityKey($space, $type, $id));
+        if ($record === null) {
+            return null;
+        }
 
-        return $space === null ? null : $this->replica->record(new EntityKey($space, $type, $id));
+        // Keyed the way the application queues: queueing an edit on
+        // $record->entity is the natural next step, and under the server's
+        // space it would sit where no push for this scope ever looks.
+        return new EntityRecord($this->key($type, $scope, $id), $record->version, $record->fields, $record->deleted, $record->deletion);
     }
 
     public function sync(string $type, ?string $scope = null, int $pageSize = 100): PushOutcome
@@ -329,8 +336,22 @@ class SyncClient
                 : null;
         }
 
+        // Fields the resolver settled for the server are not this device's to
+        // send again: rebased onto the reported version they would no longer
+        // look like a conflict, and the device would win a field the host said
+        // it must lose.
+        $kept = [];
+        foreach ((array) ($response->body->decisions ?? []) as $field => $decision) {
+            if ($decision === ConflictDecision::Server->value) {
+                $kept[(string) $field] = true;
+            }
+        }
+
         $operations = [];
         foreach ($mutation->operations as $operation) {
+            if (isset($kept[$operation->field])) {
+                continue;
+            }
             if (! array_key_exists($operation->field, $stale)) {
                 $operations[] = $operation;
 
@@ -421,6 +442,11 @@ class SyncClient
      */
     private function protocolStatus(SyncResponse $response): ?string
     {
+        if ($response->status === 401) {
+            // Whatever the body says - Laravel's own auth middleware answers
+            // {"message": "Unauthenticated."}, with no error code at all.
+            return 'unauthenticated';
+        }
         if ($response->ok()) {
             $status = $response->body->status ?? null;
             if (! is_string($status) || MutationStatus::tryFrom($status) === null) {
@@ -437,9 +463,6 @@ class SyncClient
         $error = $response->error();
         if ($error === null) {
             return null;
-        }
-        if ($response->status === 401) {
-            return 'unauthenticated';
         }
         if ($response->retriable()) {
             return 'retry';

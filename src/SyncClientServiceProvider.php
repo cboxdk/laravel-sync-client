@@ -93,14 +93,20 @@ class SyncClientServiceProvider extends ServiceProvider
         }
     }
 
-    /** @return array<string, list<string>> */
+    /** @return array<string, array<string, string>> */
     private function references(Application $app): array
     {
         $configured = $app->make(Repository::class)->get('sync-client.references');
         $references = [];
         foreach (is_array($configured) ? $configured : [] as $type => $fields) {
-            if (is_string($type) && is_array($fields)) {
-                $references[$type] = array_values(array_filter($fields, is_string(...)));
+            if (! is_string($type) || ! is_array($fields)) {
+                continue;
+            }
+            foreach ($fields as $field => $target) {
+                if (! is_string($field) || ! is_string($target)) {
+                    throw new \RuntimeException(sprintf('sync-client.references.%s must map each field to the type it points at, like [\'project_id\' => \'projects\'].', $type));
+                }
+                $references[$type][$field] = $target;
             }
         }
 

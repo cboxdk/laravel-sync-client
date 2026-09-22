@@ -149,7 +149,7 @@ it('remembers what a created record was named', function () {
 
 /** A parent and child both created offline: the child arrives pointing at the parent's real id. */
 it('sends a child created offline pointing at its parent\'s real id', function () {
-    config()->set('sync-client.references', ['nodes' => ['parent_id']]);
+    config()->set('sync-client.references', ['nodes' => ['parent_id' => 'nodes']]);
     $client = $this->syncClientAs('alice');
     $parent = $client->key('nodes', 'p1', 'parent-handle');
     $client->outbox()->queue($parent, MutationKind::Create, [Op::set('name', 'parent'), Op::set('parent_id', 'p1')], 0);
@@ -160,4 +160,28 @@ it('sends a child created offline pointing at its parent\'s real id', function (
     $parentId = $outcome->named[0]->named->id;
     $child = app(Store::class)->record(new EntityKey('team-1', 'nodes', $outcome->named[1]->named->id));
     expect($child?->value('parent_id')->value())->toBe($parentId);
+});
+
+/**
+ * The device's database restored from an older backup: it is BEHIND the server.
+ * Every write after the restore used to reuse a number the server held, be
+ * refused as a protocol violation, and be abandoned - one by one, for good.
+ */
+it('catches up when this device is behind the server', function () {
+    $client = $this->syncClientAs('alice');
+    foreach (['a', 'b'] as $id) {
+        $client->outbox()->queue($client->key('nodes', 'p1', $id), MutationKind::Create, [Op::set('name', $id), Op::set('parent_id', 'p1')], 0);
+    }
+    $client->push('nodes', 'p1');
+    // As restored from before the second write was acknowledged.
+    app(OutboxStore::class)->resetAcknowledged($client->outbox()->stream($client->key('nodes', 'p1', 'x')), 'p1', 1);
+    foreach (['c', 'd', 'e'] as $id) {
+        $client->outbox()->queue($client->key('nodes', 'p1', $id), MutationKind::Create, [Op::set('name', $id), Op::set('parent_id', 'p1')], 0);
+    }
+
+    $outcome = $client->push('nodes', 'p1');
+
+    expect($outcome->sent)->toBe(3)
+        ->and($outcome->abandoned)->toBe(0)
+        ->and($client->outbox()->pending())->toBe(0);
 });

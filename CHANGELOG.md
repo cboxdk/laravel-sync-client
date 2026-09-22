@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.0 - Unreleased
+
+Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-before-push.
+
+### Added
+
+- **Decide conflicts on the device.** `'rebase' => KeepMine::class` (or `TakeTheirs`, or your own `RebasePolicy` / `Using` closure) turns on pull-before-push: a stale edit is refused, the policy is asked about each contested field, and the same write goes again knowing what it replaces. After three refusals the server keeps both values; a busy record can delay a write, never lose it.
+- `key()` and `record()` queue and read by type and scope, without the application knowing the server's space mapping.
+- `references` config: fields that hold another record's id are rewritten from a handle to the real id before a child created offline is sent.
+- `outbox()->requeue()`, `dismiss()` and `nameOf()`.
+
+### Fixed
+
+- **A push sent another scope's queued writes under the scope it was asked for.** It drains only its own scope now.
+- **An expired session abandoned every queued write.** A 401 leaves the queue in place and sets `unauthenticated`; so does any error that is not a named refusal - a gateway's or rate limiter's JSON used to drain the queue.
+- **A device ahead of a restored server could never push again.** It renumbers downward.
+- **Two pushes could overlap** - a queue worker and a scheduler - and send the same write under the same number. One runs at a time per device, on a file lock the OS releases if the process dies.
+- **A crash between acknowledging a create and renaming what is queued behind it** stranded those writes. It is one step now.
+- **A crash during a bootstrap could wedge the view.** The view is remembered before its page is applied, and the index row is upserted.
+- **A server-wins noop was reported as saved.** `MutationOutcome::overridden()` names the fields, and `applied()` is false for them.
+
+### Upgrading
+
+- Each type and scope now travels on its own replica stream. Push what is queued before upgrading if you can: a write sent before the upgrade whose response was lost is reported abandoned on retry, although it landed.
+- Queue writes under the scope you push with - `$client->key($type, $scope, $id)`. A write queued under another label is no longer sent by that push.
+
 ## 0.4.0 - 2026-09-21
 
 ### Added

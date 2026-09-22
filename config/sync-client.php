@@ -63,13 +63,14 @@ return [
     | References
     |--------------------------------------------------------------------------
     |
-    | Fields that hold another record's id, per entity type. A record created
-    | offline is known by a handle until the server names it; a child queued
-    | under it carries that handle. Listed here, those fields are rewritten to
-    | the real id before the child is sent. Unlisted, the child reaches the
-    | server pointing at an id that never existed.
+    | Fields that hold another record's id, per entity type, each naming the
+    | type it points at. A record created offline is known by a handle until
+    | the server names it; a child queued under it carries that handle. Listed
+    | here, the field is rewritten to the real id when the parent is named -
+    | so push the parent's type before the child's. Unlisted, the child reaches
+    | the server pointing at an id that never existed.
     |
-    |     'tasks' => ['project_id', 'assignee_id'],
+    |     'tasks' => ['project_id' => 'projects', 'assignee_id' => 'users'],
     |
     */
 

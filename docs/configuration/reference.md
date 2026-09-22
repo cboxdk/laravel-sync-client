@@ -14,7 +14,7 @@ description: "Every key in config/sync-client.php."
 | `replica` | `SYNC_CLIENT_REPLICA` | — | This device's stream id. Stable for the life of the local database |
 | `database` | `SYNC_CLIENT_DATABASE` | `storage/sync/replica.sqlite` | Local SQLite file |
 | `page_size` | `SYNC_CLIENT_PAGE_SIZE` | `100` | Records per bootstrap page |
-| `references` | — | `[]` | Per entity type, the fields that hold another record's id. Rewritten from a handle to the real id before a child created offline is sent |
+| `references` | — | `[]` | Per entity type, `field => the type it points at`. Rewritten from a handle to the real id when that record is named - sync the parent's type first |
 | `rebase` | — | `null` | A `RebasePolicy` class. Null lets the server decide conflicts; a policy makes this device decide them. See [Deciding conflicts on the device](../core-concepts/rebasing.md) |
 
 There is no retry or backoff setting. Whether to retry depends on which

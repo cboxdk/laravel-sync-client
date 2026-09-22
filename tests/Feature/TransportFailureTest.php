@@ -132,3 +132,12 @@ it('keeps the queue for an error it does not recognise as a refusal', function (
     'unknown code' => [400, '{"error":"something_new"}'],
     'server error' => [500, '{"error":"invalid_request"}'],
 ]);
+
+/** Laravel's own auth middleware answers 401 with no error code; the flag must still say so. */
+it('recognises an expired session behind ordinary auth middleware', function () {
+    $this->queueTask('t1');
+
+    $outcome = respondingWith($this, 401, '{"message":"Unauthenticated."}')->push('tasks', 'team-1');
+
+    expect($outcome->unauthenticated)->toBeTrue()->and($this->outbox()->pending())->toBe(1);
+});
