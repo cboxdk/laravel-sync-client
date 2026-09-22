@@ -86,7 +86,9 @@ readonly class PushOutcome
      *
      * An application has to surface these. "Sent" is not "saved": a rejection
      * or a conflict is a final answer the user is entitled to see, and nothing
-     * else in the system will mention it.
+     * else in the system will mention it. Refusals are here too, and also kept
+     * in the outbox's abandoned() - skip those that refused() if you report
+     * from there.
      *
      * @return list<MutationOutcome>
      */

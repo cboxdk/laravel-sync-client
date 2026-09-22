@@ -65,6 +65,16 @@ readonly class MutationOutcome
     }
 
     /**
+     * Whether the server refused the write outright - rejected, invalid, a
+     * failed precondition. Such a write is also kept in the outbox's
+     * abandoned() until dismissed, so report it from one place.
+     */
+    public function refused(): bool
+    {
+        return in_array($this->status, [MutationStatus::Rejected, MutationStatus::ValidationFailed, MutationStatus::PreconditionFailed], true);
+    }
+
+    /**
      * Fields this write set that the server kept its own value for.
      *
      * @return list<string>

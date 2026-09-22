@@ -333,3 +333,23 @@ it('abandons the child of a parent that may have landed as parent_unknown', func
     expect(array_column($client->outbox()->abandoned(), 'reason'))->toBe(['forbidden', 'parent_unknown'])
         ->and($client->outbox()->mayHaveLanded($client->outbox()->abandoned()[0]['mutation']->id))->toBeTrue();
 });
+
+/** An edit queued before its record's create went out first and was refused as entity_not_found. */
+it('sends a record\'s create before an edit queued ahead of it', function () {
+    $client = $this->syncClientAs('alice');
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'P'), MutationKind::Create, [Op::set('title', 'invalid'), Op::set('status', 'open')], 0);
+    refusingInvalidTitles($this);
+    $client->push('tasks', 'team-1');
+    $client->dismiss($client->outbox()->abandoned()[0]['mutation']->id);
+
+    // Offline: an edit of P, then P created again.
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'P'), MutationKind::Update, [Op::set('status', 'done')], 0);
+    $client->outbox()->queue($client->key('tasks', 'team-1', 'P'), MutationKind::Create, [Op::set('title', 'fine'), Op::set('status', 'open')], 0);
+    $outcome = $client->push('tasks', 'team-1');
+
+    // The create first; the edit then meets the create's own value for the
+    // field - it was written without knowing it - rather than no record at all.
+    expect(array_map(fn ($o) => $o->status->value, $outcome->outcomes))->toBe(['applied', 'conflict'])
+        ->and($outcome->outcomes[1]->reason)->not->toBe('entity_not_found')
+        ->and($client->outbox()->abandoned())->toBe([]);
+});

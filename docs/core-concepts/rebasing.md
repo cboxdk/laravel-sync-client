@@ -25,6 +25,8 @@ return [
 or at runtime:
 
 ```php
+use Cbox\Sync\Client\Laravel\Rebase\KeepMine;
+
 $client->rebaseWith(new KeepMine);
 ```
 

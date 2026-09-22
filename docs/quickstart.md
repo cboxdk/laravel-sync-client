@@ -22,6 +22,10 @@ new stream and re-sends everything it has not had acknowledged.
 ## Write, offline
 
 ```php
+use Cbox\Sync\Client\Laravel\SyncClient;
+use Cbox\Sync\Data\FieldOperation;
+use Cbox\Sync\Enums\MutationKind;
+
 $client = app(SyncClient::class);
 
 $client->outbox()->queue(
@@ -112,7 +116,9 @@ foreach ($keep as [$write, $reason]) {
 // And those processed with a caveat - a conflict kept both values, the
 // server's value was kept over yours - which only this push reports.
 foreach ($outcome->needingAttention() as $problem) {
-    $this->tell($problem);
+    if (! $problem->refused()) { // refusals were told from abandoned() above
+        $this->tell($problem);
+    }
 }
 ```
 
@@ -123,11 +129,13 @@ What to do with a kept write, once someone has checked the server:
   also drops the kept create, then `$client->requeue()` each `parent_unknown`
   write that waited for it.
 - **A create that does not.** `$client->requeue($id, evenIfItMayHaveLanded: true)`;
-  its waiting writes can be requeued once it has been sent and named.
+  its waiting writes can be requeued once it is queued again.
 - **Anything else that did not land.** Requeue it the same way, or dismiss it.
 
 A write that needs a record whose create was abandoned or dismissed and never
-named cannot be requeued until that record is - `requeue()` says which.
+named cannot be requeued until that record is queued again or named - `requeue()`
+says which. (`evenIfItMayHaveLanded: true` skips that check, but the next push
+holds such a write back again.)
 
 If you write no other code from this page, write those loops. A refusal from the
 pull does not throw out of `sync()`: `$outcome->pulled` says whether the view

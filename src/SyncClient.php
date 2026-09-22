@@ -417,6 +417,15 @@ class SyncClient
             }
         }
 
+        // An edit queued before its record's create - a record created again
+        // after its first create was refused: the create goes first.
+        if ($mutation->kind !== MutationKind::Create) {
+            $own = $this->outbox->queuedCreate($mutation->entity->type, $mutation->entity->id);
+            if ($own !== null && $own->id !== $mutation->id && ! in_array($own->id, $seen, true)) {
+                return $this->nextToSend($own, $seen);
+            }
+        }
+
         // A later write to a record whose own create was refused: the record
         // will not exist until the create is requeued, and sending the edit
         // now only loses it to entity_not_found.

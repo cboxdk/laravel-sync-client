@@ -4,6 +4,11 @@
 
 Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-before-push.
 
+### Upgrading
+
+- The device's SQLite file is brought up to date in place on first use: new outbox columns and a names table. Writes queued before the upgrade count as sent once, so one refused later needs `evenIfItMayHaveLanded` to be requeued. Back the file up first; downgrading is not supported.
+- **Breaking:** `sync()` no longer throws when the pull fails - check `pullFailure` and `pulled`. A write the server refused stays in `outbox()->abandoned()` until you `dismiss()` it.
+
 ### Added
 
 - **Decide conflicts on the device.** `'rebase' => KeepMine::class` (or `TakeTheirs`, or your own `RebasePolicy` / `Using` closure) turns on pull-before-push: a stale edit is refused, the policy is asked about each contested field, and the same write goes again knowing what it replaces. After three refusals the server keeps both values; a busy record can delay a write, never lose it.

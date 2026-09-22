@@ -78,13 +78,17 @@ class SyncClientServiceProvider extends ServiceProvider
             return $index;
         });
 
+        // One push at a time per device, next to its database; bind your own
+        // PushLock for anything else.
+        $this->app->bindIf(Contracts\PushLock::class, fn (Application $app): Contracts\PushLock => new Support\FileLock($this->text($app, 'sync-client.database', '').'.lock'));
+
         $this->app->singleton(SyncClient::class, fn (Application $app): SyncClient => new SyncClient(
             $app->make(SyncTransport::class),
             $app->make(Outbox::class),
             $app->make(MultiViewClient::class),
             $app->make(ViewIndex::class),
             $this->rebasePolicy($app),
-            new Support\FileLock($this->text($app, 'sync-client.database', '').'.lock'),
+            $app->make(Contracts\PushLock::class),
             $this->references($app),
             $this->scopedBy($app),
             $this->number($app, 'sync-client.page_size', 100),

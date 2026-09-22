@@ -1,16 +1,14 @@
 # Build status
 
-Client for [cboxdk/sync](https://github.com/cboxdk/sync), released as 0.1.0 on 2026-09-18.
+Client for [cboxdk/sync](https://github.com/cboxdk/sync). 0.5.0 is prepared and not yet tagged; it requires cboxdk/sync 0.9 and, for pull-before-push, a cboxdk/laravel-sync 0.7 server.
 
 Implemented:
 
-- The push loop and its four outcomes, and the pull loop from bootstrap through delta.
-- One local SQLite file holding the replica state, the outbox and the view index.
-- A swappable transport contract, with an `Illuminate\Http` implementation.
+- The push loop and every outcome it can get, parent-first sending of records created offline, and the pull loop from bootstrap through delta.
+- One local SQLite file holding the replica state, the outbox and the view index; one push at a time per device.
+- Refused writes kept until the application dismisses them, and a guard against sending again anything that may already be on the server.
+- A swappable transport contract, with an `Illuminate\Http` implementation that reads its headers on every request.
 
-Verification on 2026-09-16:
+Verification: the suite runs the client against a real `cboxdk/laravel-sync` server in the same application, through Laravel's HTTP kernel - real routing, middleware, controllers and database - plus scripted transports for what a server alone cannot produce (gateways, timeouts, lost answers). Pint, PHPStan max with larastan and the strict rules, dependency licenses and an audit run on every build; see `composer qa`.
 
-- Pest: 19 tests, end-to-end running the client against a real `cboxdk/laravel-sync` server in the same application, through Laravel's HTTP kernel — real routing, middleware, controllers and database. Covers writing offline and draining the queue, following deltas rather than re-bootstrapping, a refused write leaving the queue without blocking what is behind it, a preserved conflict counting as sent, and a simulated process restart resuming with both synced state and an unsent write intact.
-- Pint, PHPStan max with larastan, dependency licenses and a locked audit.
-
-Limits: no scheduler, no background worker, no encryption of the local database, and no credential handling — the host supplies headers and decides when to sync. Conflict candidate values are not delivered by the transport, so a device can see that a conflict exists but not what the other proposals were.
+Limits: no scheduler, no background worker, no encryption of the local database, and no credential handling - the host supplies headers and decides when to sync.
