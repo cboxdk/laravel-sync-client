@@ -11,12 +11,18 @@ the whole substance of the package.
 
 | The server says | The client does | Why |
 |---|---|---|
-| a processed result — applied, conflicted, rejected | drops it from the queue, counts it sent | all three are answers. A conflict is not a failure: the competing proposal was preserved |
+| a processed result — applied, noop, conflicted | drops it from the queue, counts it sent | these are answers. A conflict is not a failure: the competing proposal was preserved |
+| a processed refusal — `rejected`, `validation_failed`, `precondition_failed` | counts it sent, and keeps it as abandoned under that status | the write will never land. Kept rather than dropped, because the outcome returned by this push is gone once the process is - and a refused create goes on holding back the writes that depend on it |
 | `pull_required` (only with a [rebase policy](rebasing.md)) | asks the policy what the edit should now be, and sends the same write again | nothing was stored, so the rethought write is still the one the server is waiting for |
 | `unauthenticated` (401) | stops, leaves the queue exactly as it is, and sets `unauthenticated` on the outcome | an expired session is about the device, not the write. Sign in again and sync |
 | `retriable` (503) | stops and leaves the queue exactly as it is | retrying is safe **only** under the same identity, because the engine returns the stored result for a repeated one. A fresh id would apply the write twice |
 | `mutation_gap` | renumbers from the server's acknowledged point and sends again | the server has not seen something earlier. Nothing is dropped; the queue holds only unacknowledged writes |
-| any other error | moves it out of the queue with the reason | it can never be sent again under this identity, so leaving it would block everything behind it forever |
+| `receipt_pruned` | abandons it as `receipt_pruned`; when the server is ahead of the device (a restore), everything still queued on that stream too | it may already have been applied and its answer is gone: sending it again under any number could apply it twice |
+| a refusal of this write - `invalid_request`, `invalid_field_value`, `forbidden`, `field_not_writable`, `unknown_type`, `protocol_violation`, and a 413 from anything | abandons it with the reason | it can never be sent again under this identity, so leaving it would block everything behind it forever |
+| anything else - a 5xx, a 429, an HTML page, no answer | stops, leaves the queue exactly as it is, and says which write it stopped on (`blockedBy`, `httpStatus`, `error`, `retryAfter`) | not the server refusing the write. A queue held up by one write can be told apart from a device that is offline |
+
+A child whose parent create was abandoned or refused is abandoned with it as
+`parent_abandoned`, rather than sent pointing at a record that will never exist.
 
 A gap answered twice with the same acknowledged point stops the loop rather than
 spinning: if resending has not helped once, it will not help, and looping
@@ -46,10 +52,21 @@ its reason. **Surface them.** Nothing else in the system will tell the user that
 something they typed is gone, and a queue that silently swallows writes is worse
 than one that fails loudly.
 
-Then either `requeue($mutationId)` - when the refusal was about the moment, say a
-permission the user has since been given - or `dismiss($mutationId)` once the
-user has been told. A requeued write goes to the back of the queue under a new
-identity, because the server may hold a receipt for the old one.
+Then either `$client->requeue($mutationId)` - when the refusal was about the
+moment, say a permission the user has since been given - or
+`$client->dismiss($mutationId)` once the user has been told. A requeued write goes
+to the back of the queue under a new identity, because the server may hold a
+receipt for the old one. Dismissing a create abandons the writes that need its
+record as `parent_abandoned`, for you to report in turn.
+
+A `receipt_pruned` or `protocol_violation` write may already be on the server.
+`requeue()` refuses it unless you pass `evenIfItMayHaveLanded: true` after
+checking, because a second identity applies it twice - a create becomes two
+records.
+
+`sync()` returns the push's outcome even when the pull after it fails; the
+failure is on `pullFailure`, and an expired session sets `unauthenticated` for
+either half.
 
 ## When one side restored a backup
 

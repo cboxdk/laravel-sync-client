@@ -16,15 +16,15 @@ use Cbox\Sync\Enums\MutationKind;
 $client = app(SyncClient::class);
 
 // Works with no network. The write is queued locally and durably.
+$entity = $client->key('tasks', $teamId, $taskId);
 $client->outbox()->queue($entity, MutationKind::Update, [
     FieldOperation::set('title', $title),
 ], $baseVersion);
 
 // When there is a connection.
-$client->push('tasks', $teamId);
-$client->pull('tasks', $teamId);
+$outcome = $client->sync('tasks', $teamId);
 
-$client->replica()->record($entity);
+$client->record('tasks', $teamId, $taskId);
 ```
 
 Everything the device knows lives in one local SQLite file: the replica's

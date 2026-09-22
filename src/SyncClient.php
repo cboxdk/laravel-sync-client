@@ -54,6 +54,9 @@ class SyncClient
      * The server's answers that refuse a write for good. Everything else is
      * either a success, a pause, or not the server speaking at all.
      */
+    /** Processed answers that mean the write will never be applied. */
+    private const REFUSED = ['rejected', 'validation_failed', 'precondition_failed'];
+
     private const TERMINAL = [
         'invalid_request',
         'invalid_field_value',
@@ -77,6 +80,8 @@ class SyncClient
         private readonly array $references = [],
         /** @var array<string, string> entity type => the type whose id is its scope */
         private readonly array $scopedBy = [],
+        /** Records per bootstrap page when a call does not say. */
+        private readonly int $pageSize = 100,
     ) {}
 
     /**
@@ -154,10 +159,17 @@ class SyncClient
         return new EntityRecord($this->key($type, $scope, $id), $record->version, $record->fields, $record->deleted, $record->deletion);
     }
 
-    public function sync(string $type, ?string $scope = null, int $pageSize = 100): PushOutcome
+    public function sync(string $type, ?string $scope = null, ?int $pageSize = null): PushOutcome
     {
         $outcome = $this->push($type, $scope);
-        $this->pull($type, $scope, $pageSize);
+        try {
+            $this->pull($type, $scope, $pageSize);
+        } catch (Exceptions\SyncRequestFailed $failed) {
+            // The push already happened, and what it reports - writes the
+            // server refused - is the application's to tell the user. Thrown
+            // away with a failed pull, that report was gone for good.
+            return $outcome->withPull($failed);
+        }
 
         return $outcome;
     }
@@ -209,13 +221,21 @@ class SyncClient
     {
         $sent = 0;
         $abandoned = 0;
-        $resumed = null;
+        /** @var array<string, int> $resumed the last gap answer per stream */
+        $resumed = [];
         $outcomes = [];
         $named = [];
         $rebased = 0;
         /** @var array<string, int> $refusals */
         $refusals = [];
         $label = $scope ?? self::UNSCOPED;
+        // By reference: the counts at the moment the queue stops, not at the start.
+        $wait = function (Mutation $blocked, SyncResponse $response, bool $unauthenticated = false) use (&$sent, &$abandoned, &$outcomes, &$named, &$rebased): PushOutcome {
+            return new PushOutcome(
+                $sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased, unauthenticated: $unauthenticated,
+                blockedBy: $blocked->id, httpStatus: $response->status, error: $response->error(), retryAfter: $response->retryAfter,
+            );
+        };
 
         // Only this type's queue, in this scope - the wire carries the type and
         // scope the mutation was queued under, and draining anything wider
@@ -256,7 +276,7 @@ class SyncClient
                 // timeout, an empty body. The queue is left exactly as it is.
                 // Acknowledging would lose the write; abandoning would lose it
                 // permanently, and a transient outage would drain everything.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+                return $wait($mutation, $response);
             }
 
             if ($status === 'pull_required' && $this->rebase !== null) {
@@ -265,7 +285,7 @@ class SyncClient
                 // for that: the refusal carries exactly the fields in question,
                 // and sync() pulls the rest straight after.
                 if (! $this->rebaseOnto($mutation, $response, $this->rebase)) {
-                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+                    return $wait($mutation, $response);
                 }
                 $refusals[$mutation->id] = ($refusals[$mutation->id] ?? 0) + 1;
                 $rebased++;
@@ -276,7 +296,7 @@ class SyncClient
                 // Only ever sent on_conflict=pull with a policy in hand, so this
                 // is a server answering a question it was not asked. Leaving the
                 // queue alone is the one response that cannot lose the write.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+                return $wait($mutation, $response);
             }
 
             if ($status === 'receipt_pruned') {
@@ -286,7 +306,8 @@ class SyncClient
                 // Its own position counts as acknowledged: jumping to the
                 // server's would renumber older replays behind it past the
                 // pruned range, and they would be applied a second time.
-                $this->outbox->settledUnknown($mutation);
+                $known = $response->body->acknowledged_sequence ?? null;
+                $this->outbox->settledUnknown($mutation, is_int($known) ? $known : null);
                 $abandoned++;
 
                 continue;
@@ -299,18 +320,29 @@ class SyncClient
                 // Twice in a row with the same answer means resending will
                 // never help, and looping against a live server is far worse
                 // than stopping and letting the caller see it.
-                if ($resumed === $acknowledged) {
-                    return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+                if (($resumed[$mutation->replica->id] ?? null) === $acknowledged) {
+                    return $wait($mutation, $response);
                 }
-                $resumed = $acknowledged;
+                $resumed[$mutation->replica->id] = $acknowledged;
                 $this->outbox->resumeAfter($mutation, $acknowledged);
 
                 continue;
             }
-            $resumed = null;
+            unset($resumed[$mutation->replica->id]);
 
             if ($status === 'processed') {
                 $outcomes[] = $this->outcome($mutation, $response);
+                $answer = $response->body->status ?? null;
+                if (in_array($answer, self::REFUSED, true)) {
+                    // Processed and refused: kept, under the server's word
+                    // for why, until the application dismisses it - and a
+                    // refused create goes on holding back what depends on it.
+                    $this->outbox->refused($mutation, $answer);
+                    $sent++;
+                    $abandoned++;
+
+                    continue;
+                }
                 $rename = $this->named($mutation, $response);
                 // One step: the create leaves the queue and everything behind it
                 // is renamed together, or neither happens.
@@ -331,20 +363,20 @@ class SyncClient
             if ($status === 'retry') {
                 // Retrying is safe only under the same identity, so the queue
                 // stays untouched and in order.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased);
+                return $wait($mutation, $response);
             }
 
             if ($status === 'unauthenticated') {
                 // About the session, not the write. Abandoning here turned one
                 // expired token into every queued write lost; the queue waits
                 // for the user to sign in again instead.
-                return new PushOutcome($sent, $abandoned, retryLater: true, outcomes: $outcomes, named: $named, rebased: $rebased, unauthenticated: true);
+                return $wait($mutation, $response, true);
             }
 
             // Terminal for this identity. It leaves the queue rather than
             // blocking everything behind it forever, and the application has to
             // be told: nothing else will reveal that a write never landed.
-            $this->outbox->abandon($mutation, $response->error() ?? 'rejected');
+            $this->outbox->abandon($mutation, $response->error() ?? ($response->status === 413 ? 'body_too_large' : 'rejected'));
             $abandoned++;
         }
 
@@ -404,9 +436,19 @@ class SyncClient
      * Send an abandoned write again, under every name the server has given
      * since - the record, the scope it lives in, the records it points at.
      */
-    public function requeue(string $mutationId): ?Mutation
+    public function requeue(string $mutationId, bool $evenIfItMayHaveLanded = false): ?Mutation
     {
-        return $this->outbox->requeue($mutationId, $this->references, $this->scopedBy);
+        return $this->outbox->requeue($mutationId, $this->references, $this->scopedBy, $evenIfItMayHaveLanded);
+    }
+
+    /**
+     * The application has told the user about an abandoned write; stop
+     * reporting it. A dismissed create takes the writes that need its record
+     * along with it, as parent_abandoned.
+     */
+    public function dismiss(string $mutationId): void
+    {
+        $this->outbox->dismiss($mutationId, $this->references, $this->scopedBy);
     }
 
     /**
@@ -564,6 +606,11 @@ class SyncClient
             };
         }
 
+        if ($response->status === 413) {
+            // Too large, whoever says so - the server, or a proxy in front of it
+            // answering in HTML. Sent again it is exactly as large.
+            return 'terminal';
+        }
         $error = $response->error();
         if ($error === null) {
             return null;
@@ -595,8 +642,9 @@ class SyncClient
      * in a loop would spin against a moving target rather than letting the
      * application decide to back off.
      */
-    public function pull(string $type, ?string $scope = null, int $pageSize = 100): void
+    public function pull(string $type, ?string $scope = null, ?int $pageSize = null): void
     {
+        $pageSize ??= $this->pageSize;
         try {
             $this->follow($type, $scope, $pageSize);
         } catch (Exceptions\SyncRequestFailed $failed) {
@@ -717,8 +765,15 @@ class SyncClient
         if ($response->ok()) {
             return true;
         }
-
-        if ($response->error() === null) {
+        if ($response->status === 401) {
+            // Laravel's own auth middleware answers with no error code, and
+            // taking that for a non-answer left a device with an expired
+            // session reporting all clear while it stopped receiving anything.
+            throw new Exceptions\SyncRequestFailed('unauthenticated', 401);
+        }
+        if ($response->error() === null || $response->retriable()) {
+            // Not an answer, or "come back later": the view stays where it
+            // is, and the next pull carries on from there.
             return false;
         }
 

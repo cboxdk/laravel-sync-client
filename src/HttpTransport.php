@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cbox\Sync\Client\Laravel;
 
+use Cbox\Sync\Client\Laravel\Contracts\SyncHeaders;
 use Cbox\Sync\Client\Laravel\Contracts\SyncTransport;
 use Cbox\Sync\Client\Laravel\ValueObjects\SyncResponse;
 use Illuminate\Http\Client\ConnectionException;
@@ -11,11 +12,11 @@ use Illuminate\Http\Client\Factory;
 
 class HttpTransport implements SyncTransport
 {
-    /** @param array<string, string> $headers */
+    /** @param array<string, string>|SyncHeaders $headers fixed, or asked for on every request */
     public function __construct(
         private readonly Factory $http,
         private readonly string $baseUrl,
-        private readonly array $headers = [],
+        private readonly array|SyncHeaders $headers = [],
         private readonly int $timeoutSeconds = 30,
     ) {}
 
@@ -39,7 +40,7 @@ class HttpTransport implements SyncTransport
     private function send(string $endpoint, array $body): SyncResponse
     {
         $response = $this->http
-            ->withHeaders($this->headers + ['Accept' => 'application/json'])
+            ->withHeaders(($this->headers instanceof SyncHeaders ? $this->headers->headers() : $this->headers) + ['Accept' => 'application/json'])
             ->timeout($this->timeoutSeconds)
             // No automatic retry here. A retry is only safe when it reuses the
             // same mutation id, and whether that is the right move depends on
@@ -58,7 +59,9 @@ class HttpTransport implements SyncTransport
         // empty array - consistently, so nothing downstream would notice.
         $decoded = json_decode($response->body(), false, 512);
 
-        return new SyncResponse($response->status(), $decoded instanceof \stdClass ? $decoded : new \stdClass);
+        $retryAfter = $response->header('Retry-After');
+
+        return new SyncResponse($response->status(), $decoded instanceof \stdClass ? $decoded : new \stdClass, ctype_digit($retryAfter) ? (int) $retryAfter : null);
     }
 
     /** @param array<string, mixed> $body */

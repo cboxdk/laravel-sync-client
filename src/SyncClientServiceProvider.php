@@ -61,10 +61,12 @@ class SyncClientServiceProvider extends ServiceProvider
             new Replica($this->required($app, 'sync-client.replica', 'sync-client.replica must be set and stable for this device.')),
         ));
 
+        $this->app->bindIf(Contracts\SyncHeaders::class, fn (Application $app): Contracts\SyncHeaders => new Support\ConfiguredHeaders($app->make(Repository::class)));
+
         $this->app->bindIf(SyncTransport::class, fn (Application $app): SyncTransport => new HttpTransport(
             $app->make(Factory::class),
             $this->required($app, 'sync-client.url', 'sync-client.url must point at the sync server.'),
-            $this->headers($app),
+            $app->make(Contracts\SyncHeaders::class),
             $this->number($app, 'sync-client.timeout', 30),
         ));
 
@@ -84,6 +86,7 @@ class SyncClientServiceProvider extends ServiceProvider
             new Support\FileLock($this->text($app, 'sync-client.database', '').'.lock'),
             $this->references($app),
             $this->scopedBy($app),
+            $this->number($app, 'sync-client.page_size', 100),
         ));
     }
 
@@ -169,22 +172,5 @@ class SyncClientServiceProvider extends ServiceProvider
         $value = $app->make(Repository::class)->get($key);
 
         return is_int($value) && $value > 0 ? $value : $fallback;
-    }
-
-    /** @return array<string, string> */
-    private function headers(Application $app): array
-    {
-        $configured = $app->make(Repository::class)->get('sync-client.headers');
-        if (! is_array($configured)) {
-            return [];
-        }
-        $headers = [];
-        foreach ($configured as $name => $value) {
-            if (is_string($name) && is_string($value)) {
-                $headers[$name] = $value;
-            }
-        }
-
-        return $headers;
     }
 }

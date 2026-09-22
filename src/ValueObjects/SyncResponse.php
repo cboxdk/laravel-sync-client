@@ -7,7 +7,8 @@ namespace Cbox\Sync\Client\Laravel\ValueObjects;
 /** One answer from the server, already decoded. */
 readonly class SyncResponse
 {
-    public function __construct(public int $status, public \stdClass $body) {}
+    /** @param int|null $retryAfter seconds the server asked to wait, from Retry-After */
+    public function __construct(public int $status, public \stdClass $body, public ?int $retryAfter = null) {}
 
     public function ok(): bool
     {

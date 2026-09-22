@@ -130,7 +130,10 @@ it('reports what the server decided about each write, not just how many were sen
     $outcome = $this->drain($client, 'tasks', 'team-1');
 
     expect($outcome->sent)->toBe(2);
-    expect($outcome->abandoned)->toBe(0);
+    // Kept, under the server's reason, until the application dismisses it:
+    // the outcome below is gone the moment the process is.
+    expect($outcome->abandoned)->toBe(1);
+    expect($client->outbox()->abandoned()[0]['reason'])->toBe('rejected');
 
     // "Sent" is not "saved". Without this an application cannot tell the user
     // that something they typed never landed.

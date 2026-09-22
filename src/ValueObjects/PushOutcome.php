@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cbox\Sync\Client\Laravel\ValueObjects;
 
+use Cbox\Sync\Client\Laravel\Exceptions\SyncRequestFailed;
+
 readonly class PushOutcome
 {
     /** @var list<MutationOutcome> */
@@ -34,6 +36,22 @@ readonly class PushOutcome
          * dropped; sign in again and sync.
          */
         public bool $unauthenticated = false,
+        /**
+         * When the queue stopped on one write: that write's id, and what the
+         * server answered - so an application can tell a queue held up by one
+         * write from a device that is merely offline.
+         */
+        public ?string $blockedBy = null,
+        public ?int $httpStatus = null,
+        public ?string $error = null,
+        /** Seconds the server asked to wait before trying again, when it said. */
+        public ?int $retryAfter = null,
+        /**
+         * sync() only: the pull after the push was refused. The push's own
+         * outcome above still stands - its refusals are the application's to
+         * report either way.
+         */
+        public ?SyncRequestFailed $pullFailure = null,
     ) {
         $copy = [];
         foreach ($outcomes as $outcome) {
@@ -46,6 +64,16 @@ readonly class PushOutcome
             $names[] = $rename;
         }
         $this->named = $names;
+    }
+
+    /** This outcome, with what the pull that followed it ran into. */
+    public function withPull(?SyncRequestFailed $failure): self
+    {
+        return new self(
+            $this->sent, $this->abandoned, $this->retryLater, $this->outcomes, $this->named, $this->rebased,
+            $this->unauthenticated || $failure?->errorCode === 'unauthenticated',
+            $this->blockedBy, $this->httpStatus, $this->error, $this->retryAfter, $failure,
+        );
     }
 
     /**

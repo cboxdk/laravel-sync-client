@@ -12,6 +12,12 @@ Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-be
 - A write whose receipt the server has pruned (`receipt_pruned`) is abandoned as final at its own position, so older replays behind it keep theirs and are never applied twice.
 - A sent write keeps its number, and a stream resends a waiting write before numbering another, so a parent sent out of queue order cannot collide with another write through a lost answer. Writes queued after their parent was named are mapped through the name; an edit to a record whose create was refused is held with it for `requeue()`.
 - `outbox()->requeue()`, `dismiss()` and `nameOf()`.
+- **A write the server processed and refused is kept**, as abandoned under the server's status (`rejected`, `validation_failed`, `precondition_failed`), until the application dismisses it. It used to live only in the push's return value, and a pull failing after it - or the process ending - lost it without a trace. A refused create now holds back its children too; one that was answered `validation_failed` used to have its child applied pointing at a record that never existed.
+- `$client->dismiss()` takes the writes that need a dismissed create with it (`parent_abandoned`), and `requeue()` refuses a `receipt_pruned` or `protocol_violation` write unless told `evenIfItMayHaveLanded`.
+- `sync()` returns the push's outcome even when the pull fails (`pullFailure`), and a 401 on the pull sets `unauthenticated` instead of reporting all clear.
+- **Headers are read on every request** (`Contracts\SyncHeaders`, config by default), so a token refreshed after sign-in is the one sent.
+- A 413 is final whoever answers it. When the queue stops on one write, the outcome names it (`blockedBy`, `httpStatus`, `error`, `retryAfter`).
+- A reused handle, or one another scope named differently, is no longer mapped to the wrong record; `page_size` from the config is used; two streams gapping at the same point no longer stop the drain.
 
 ### Fixed
 
