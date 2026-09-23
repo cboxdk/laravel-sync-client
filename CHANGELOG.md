@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 - Unreleased
+
+### Documentation
+
+- `replica()`, `SyncClient::UNSCOPED`, `StaleField::theirsIsHidden()` and `RebaseChoice::drops()` are documented, and the index links the quickstart and requirements.
+
+### Tests
+
+- CI runs the suite against a MySQL and a PostgreSQL server, on PHP 8.4 and 8.5. The device's own database is always SQLite.
+
 ## 0.5.0 - 2026-09-22
 
 Requires `cboxdk/sync` 0.9 and a server on `cboxdk/laravel-sync` 0.7 for pull-before-push.

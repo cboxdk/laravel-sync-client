@@ -75,7 +75,9 @@ named in config.
 
 `$field->theirs` is null when this device may write the field but not read it:
 the server never discloses a value past the read whitelist, so the policy has to
-decide without seeing it.
+decide without seeing it - `$field->theirsIsHidden()` says so plainly. On the
+answer side, `$choice->drops()` is true for `takeTheirs()`, the one choice that
+gives up this device's edit; a policy that logs what it decided can report it.
 
 ## What the server still decides
 

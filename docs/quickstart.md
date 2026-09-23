@@ -153,6 +153,13 @@ $record?->value('title')->value();
 $record?->version->value; // send this as baseVersion when you edit it
 ```
 
+`record()` and `key()` speak your types and scopes. The replica underneath keys
+records by the server's own space, which the server maps from your scope, and
+`$client->replica()` reaches it directly when you need the whole local view. A
+type you sync without a scope is keyed under `SyncClient::UNSCOPED` (`'~'`); that
+is the `space` you will see on entries from `abandoned()` for such a write, and
+it is never sent to the server.
+
 ## Stay current without polling hard
 
 Subscribe to the server's change notification, and call `sync()` when it fires.

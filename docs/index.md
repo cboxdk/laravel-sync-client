@@ -14,6 +14,8 @@ with each answer the server gives.
 
 ## Sections
 
+- [Quickstart](quickstart.md) — write offline, sync, and the two loops worth writing
+- [Requirements](requirements.md)
 - [Getting started](getting-started/_index.md)
 - [Core concepts](core-concepts/_index.md) — the push outcomes, and deciding conflicts on the device
 - [Configuration](configuration/_index.md)

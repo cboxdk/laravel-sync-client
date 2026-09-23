@@ -51,3 +51,52 @@ jobs:
         run: |
           php bin/generate-requirements.php
           git diff --exit-code -- docs/requirements.md
+
+  databases:
+    name: ${{ matrix.database }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cboxdk/php-baseimages/php-cli:${{ matrix.php || '8.4' }}-bookworm-dev-v1
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgres, mysql]
+        php: ['8.4', '8.5']
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sync
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: sync
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: sync
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping" --health-interval 5s --health-timeout 5s --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # The device's own database is always SQLite; this is the server the
+      # client talks to, which a host may run on either.
+      - name: Run tests against a ${{ matrix.database }} server
+        run: vendor/bin/pest
+        env:
+          SYNC_DRIVER: ${{ matrix.database == 'postgres' && 'pgsql' || 'mysql' }}
+          SYNC_DATABASE: sync
+          SYNC_HOST: ${{ matrix.database == 'postgres' && 'postgres' || 'mysql' }}
+          SYNC_PORT: ${{ matrix.database == 'postgres' && '5432' || '3306' }}
+          SYNC_USERNAME: ${{ matrix.database == 'postgres' && 'sync' || 'root' }}
+          SYNC_PASSWORD: secret
